@@ -3,7 +3,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
-import cesium from 'vite-plugin-cesium' 
+import cesium from 'vite-plugin-cesium'
 
 export default defineConfig({
   plugins: [
@@ -11,11 +11,16 @@ export default defineConfig({
     Components({
       resolvers: [ElementPlusResolver()],
     }),
-    cesium(),// 引入cesesium插件
+    cesium(), // 引入cesesium插件
   ],
+  base: './',
+  build: {
+    outDir: 'dist', // 构建输出目录
+    assetsDir: 'assets', // 静态资源目录
+  },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
-  }
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
 })
