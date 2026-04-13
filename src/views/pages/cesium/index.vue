@@ -261,20 +261,7 @@
                 style="width: 100px"
               />
             </div>
-            <!-- 飞机列表 -->
-            <div v-if="flightSimEnabled" class="flight-list">
-              <div
-                class="flight-item"
-                v-for="plane in planes"
-                :key="plane.id"
-                :class="{ active: selectedPlaneId === plane.id }"
-                @click="selectPlane(plane.id)"
-              >
-                <span class="flight-dot" :style="{ background: plane.color }"></span>
-                <span class="flight-name">{{ plane.name }}</span>
-                <span class="flight-status">{{ plane.status }}</span>
-              </div>
-            </div>
+            <div v-if="!flightSimEnabled" class="empty-hint">开启后显示飞机航线</div>
             <div v-if="!flightSimEnabled" class="empty-hint">开启后显示飞机航线</div>
           </div>
         </div>
@@ -392,6 +379,41 @@
       </div>
     </div>
 
+    <!-- 飞机列表浮动面板（右侧面板左侧，高度居中） -->
+    <div class="flight-float-panel" v-if="flightSimEnabled && planes.length > 0">
+      <div class="flight-panel-header">
+        <span class="flight-panel-icon">✈</span>
+        <span class="flight-panel-title">航班监控</span>
+        <span class="flight-panel-count">{{ planes.length }}</span>
+      </div>
+      <div class="flight-list-scroll">
+        <div
+          class="flight-card"
+          v-for="plane in planes"
+          :key="plane.id"
+          :class="{ active: selectedPlaneId === plane.id }"
+          :style="{ '--card-accent': plane.color }"
+          @click="selectPlane(plane.id)"
+        >
+          <div class="flight-card-header">
+            <span class="flight-dot" :style="{ background: plane.color }"></span>
+            <span class="flight-name">{{ plane.flightNo }}</span>
+            <span
+              class="flight-status"
+              :style="{ color: plane.status === '飞行中' ? '#3fb950' : '#888' }"
+            >
+              {{ plane.status }}
+            </span>
+          </div>
+          <div class="flight-card-route">
+            <span class="route-from">{{ plane.from }}</span>
+            <span class="route-arrow">→</span>
+            <span class="route-to">{{ plane.to }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 绘制模式提示 -->
     <div class="draw-tip" v-if="drawMode">
       <span
@@ -438,7 +460,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, reactive, onUnmounted } from 'vue'
+import { onMounted, ref, reactive, onUnmounted, watch } from 'vue'
 import * as Cesium from 'cesium'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import { ElMessage } from 'element-plus'
@@ -574,6 +596,10 @@ const flightSimEnabled = ref(false)
 const flightShowTrail = ref(true)
 const flightFollow = ref(false)
 const flightSpeed = ref(5)
+// 飞行速度变化时同步到时钟
+watch(flightSpeed, (val) => {
+  if (viewer) viewer.clock.multiplier = val
+})
 const selectedPlaneId = ref<string>('')
 
 interface PlaneInfo {
@@ -592,6 +618,7 @@ interface PlaneInfo {
   entity: Cesium.Entity | null
   trailEntity: Cesium.Entity | null
   waypointEntities: Cesium.Entity[]
+  hitArea: Cesium.Entity | null // 飞机点击区域
 }
 
 const planes = ref<PlaneInfo[]>([])
@@ -948,11 +975,13 @@ const addDemoPOIs = () => {
   ]
 
   pois.forEach((poi) => {
+    const pos = Cesium.Cartesian3.fromDegrees(poi.lng, poi.lat, 100)
+    // 可见点
     viewer.entities.add({
       name: poi.name,
-      position: Cesium.Cartesian3.fromDegrees(poi.lng, poi.lat, 100),
+      position: pos,
       point: {
-        pixelSize: 12,
+        pixelSize: 14,
         color: Cesium.Color.fromCssColorString('#6C5CE7'),
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 2,
@@ -961,12 +990,12 @@ const addDemoPOIs = () => {
       },
       label: {
         text: poi.name,
-        font: '13px sans-serif',
+        font: 'bold 14px sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
+        outlineWidth: 3,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        pixelOffset: new Cesium.Cartesian2(0, -20),
+        pixelOffset: new Cesium.Cartesian2(0, -22),
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
@@ -983,7 +1012,7 @@ const addDemoPOIs = () => {
 }
 
 // ============ 弹窗 Popup ============
-const showEntityPopup = (entity: Cesium.Entity, windowPosition: any) => {
+const showEntityPopup = (entity: Cesium.Entity, windowPosition: Cesium.Cartesian2) => {
   const props: Record<string, string> = {}
   // 属性名映射（中文友好名称）
   const nameMap: Record<string, string> = {
@@ -999,12 +1028,18 @@ const showEntityPopup = (entity: Cesium.Entity, windowPosition: any) => {
     desc: '描述',
     type: '', // 隐藏内部标识
   }
-  if (entity.properties) {
+  if (entity.properties && entity.propertyNames.length > 0) {
     const propertyNames = entity.propertyNames
+    const propsObj = entity.properties as any
+    // 兼容：Cesium PropertyBag 用 getProperty，普通对象用属性访问
+    const getVal =
+      typeof propsObj.getProperty === 'function'
+        ? (name: string) => propsObj.getProperty(name)
+        : (name: string) => propsObj[name]
     propertyNames.forEach((name: string) => {
       const displayName = nameMap[name] !== undefined ? nameMap[name] : name
       if (!displayName) return // 跳过隐藏的属性
-      const val = entity.properties!.getByName(name)
+      const val = getVal(name)
       let value = ''
       if (val && val.getValue) {
         value = String(val.getValue(Cesium.JulianDate.now()))
@@ -1018,15 +1053,12 @@ const showEntityPopup = (entity: Cesium.Entity, windowPosition: any) => {
   }
 
   popup.visible = true
-  popup.title = entity.name || '未命名'
+  popup.title = entity.name || '未命名实体'
   popup.properties = props
 
-  // 使用屏幕坐标定位弹窗
-  const pos = windowPosition
-  if (typeof pos === 'object' && 'x' in pos) {
-    popup.x = Math.min(pos.x + 15, window.innerWidth - 260)
-    popup.y = Math.min(pos.y - 10, window.innerHeight - 200)
-  }
+  // 使用屏幕坐标定位弹窗（相对于容器）
+  popup.x = Math.min(windowPosition.x + 15, window.innerWidth - 280)
+  popup.y = Math.min(windowPosition.y - 15, window.innerHeight - 220)
 }
 
 const closePopup = () => {
@@ -1610,6 +1642,7 @@ const onKeyDown = (e: KeyboardEvent) => {
 
 /** 定义飞机航线数据 */
 const flightRoutes = [
+  // ========== 国内干线（从成都出发） ==========
   {
     id: 'CA4401',
     name: '国航4401',
@@ -1620,9 +1653,8 @@ const flightRoutes = [
     model: '波音737-800',
     altitude: 10000,
     speed: 850,
-    // 航路点 [经度, 纬度]
     waypoints: [
-      [104.0668, 30.5728], // 天府机场
+      [104.0668, 30.5728],
       [105.0, 31.2],
       [106.5, 31.8],
       [108.0, 32.5],
@@ -1632,7 +1664,7 @@ const flightRoutes = [
       [113.0, 35.5],
       [114.5, 36.2],
       [116.0, 37.5],
-      [116.6, 40.1], // 北京首都
+      [116.6, 40.1],
     ],
   },
   {
@@ -1658,7 +1690,7 @@ const flightRoutes = [
       [116.0, 30.5],
       [117.5, 31.0],
       [119.0, 31.2],
-      [121.8, 31.1], // 上海浦东
+      [121.8, 31.1],
     ],
   },
   {
@@ -1683,7 +1715,187 @@ const flightRoutes = [
       [111.0, 25.5],
       [112.0, 25.0],
       [113.0, 24.5],
-      [113.5, 23.5], // 广州白云
+      [113.5, 23.5],
+    ],
+  },
+
+  // ========== 国内其他航线 ==========
+  {
+    id: 'CZ3456',
+    name: '南航3456',
+    flightNo: 'CZ3456',
+    color: '#A29BFE',
+    from: '成都天府',
+    to: '深圳宝安',
+    model: '波音787-9',
+    altitude: 10200,
+    speed: 860,
+    waypoints: [
+      [104.0668, 30.5728],
+      [105.5, 28.5],
+      [107.0, 27.0],
+      [108.5, 26.0],
+      [110.0, 24.5],
+      [112.0, 23.5],
+      [113.8, 22.7],
+    ],
+  },
+  {
+    id: 'HU7890',
+    name: '海航7890',
+    flightNo: 'HU7890',
+    color: '#55EFC4',
+    from: '成都天府',
+    to: '海口美兰',
+    model: '波音737-800',
+    altitude: 9000,
+    speed: 790,
+    waypoints: [
+      [104.0668, 30.5728],
+      [106.0, 27.5],
+      [108.0, 25.0],
+      [110.0, 22.5],
+      [110.4, 20.0],
+    ],
+  },
+  {
+    id: 'FM9012',
+    name: '上航9012',
+    flightNo: 'FM9012',
+    color: '#FAB1A0',
+    from: '上海浦东',
+    to: '北京大兴',
+    model: '空客A350-900',
+    altitude: 11000,
+    speed: 910,
+    waypoints: [
+      [121.8, 31.1],
+      [120.0, 32.5],
+      [118.0, 33.5],
+      [116.5, 36.0],
+      [117.0, 39.0],
+      [116.4, 39.5],
+    ],
+  },
+  {
+    id: 'CA1301',
+    name: '国航1301',
+    flightNo: 'CA1301',
+    color: '#E17055',
+    from: '北京首都',
+    to: '广州白云',
+    model: '波音777-300ER',
+    altitude: 11500,
+    speed: 920,
+    waypoints: [
+      [116.6, 40.1],
+      [114.5, 38.0],
+      [113.0, 35.0],
+      [112.0, 32.0],
+      [111.5, 29.5],
+      [112.0, 26.5],
+      [113.5, 23.5],
+    ],
+  },
+  {
+    id: 'MU5678',
+    name: '东航5678',
+    flightNo: 'MU5678',
+    color: '#81ECEC',
+    from: '广州白云',
+    to: '杭州萧山',
+    model: '空客A321neo',
+    altitude: 8800,
+    speed: 800,
+    waypoints: [
+      [113.5, 23.5],
+      [114.0, 26.0],
+      [115.0, 28.0],
+      [116.5, 29.5],
+      [118.5, 30.0],
+      [120.4, 30.2],
+    ],
+  },
+
+  // ========== 国际/地区航线 ==========
+  {
+    id: 'CA981',
+    name: '国航981',
+    flightNo: 'CA981',
+    color: '#FF7675',
+    from: '北京首都',
+    to: '东京成田',
+    model: '波音777-300ER',
+    altitude: 12500,
+    speed: 950,
+    waypoints: [
+      [116.6, 40.1],
+      [122.0, 39.0],
+      [128.0, 37.5],
+      [135.0, 36.0],
+      [138.0, 35.5],
+      [140.0, 35.8],
+    ],
+  },
+  {
+    id: 'MU587',
+    name: '东航587',
+    flightNo: 'MU587',
+    color: '#74B9FF',
+    from: '上海浦东',
+    to: '纽约肯尼迪',
+    model: '波音777-300ER',
+    altitude: 12800,
+    speed: 980,
+    waypoints: [
+      [121.8, 31.1],
+      [126.0, 33.0],
+      [132.0, 33.5],
+      [140.0, 38.0],
+      [150.0, 43.0],
+      [160.0, 51.0],
+      [170.0, 53.0],
+      [-73.8, 40.6],
+    ],
+  },
+  {
+    id: 'SQ801',
+    name: '新航801',
+    flightNo: 'SQ801',
+    color: '#FD79A8',
+    from: '新加坡樟宜',
+    to: '悉尼金斯福德',
+    model: '空客A350-900',
+    altitude: 12000,
+    speed: 910,
+    waypoints: [
+      [103.99, 1.36],
+      [110.0, -5.0],
+      [118.0, -15.0],
+      [128.0, -25.0],
+      [140.0, -32.0],
+      [151.2, -33.9],
+    ],
+  },
+  {
+    id: 'CX888',
+    name: '国泰888',
+    flightNo: 'CX888',
+    color: '#FDCB6E',
+    from: '香港赤鱲角',
+    to: '伦敦希思罗',
+    model: '空客A380-800',
+    altitude: 12200,
+    speed: 940,
+    waypoints: [
+      [114.11, 22.3],
+      [110.0, 18.0],
+      [104.0, 13.0],
+      [97.0, 8.0],
+      [88.0, 5.0],
+      [78.0, 15.0],
+      [60.0, 42.0],
+      [-0.46, 51.47],
     ],
   },
 ]
@@ -1769,7 +1981,7 @@ const initFlightSim = () => {
     })
     planeEntity.show = false
 
-    // 航线轨迹线（静态虚线）
+    // 航线轨迹线 — 科技蓝发光虚线
     const trailEntity = viewer.entities.add({
       name: `${route.name}-航线`,
       polyline: {
@@ -1790,11 +2002,13 @@ const initFlightSim = () => {
     const waypointEntities = route.waypoints.map((wp, idx) => {
       const isStart = idx === 0
       const isEnd = idx === route.waypoints.length - 1
+      const displayName = isStart ? route.from : isEnd ? route.to : `航路点${idx}`
+      // 可见的小点
       const wpEntity = viewer.entities.add({
-        name: isStart ? route.from : isEnd ? route.to : `航路点${idx}`,
+        name: displayName,
         position: Cesium.Cartesian3.fromDegrees(wp[0]!, wp[1]!, route.altitude),
         point: {
-          pixelSize: isStart || isEnd ? 8 : 5,
+          pixelSize: isStart || isEnd ? 10 : 6,
           color: Cesium.Color.fromCssColorString(route.color),
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: isStart || isEnd ? 2 : 1,
@@ -1802,12 +2016,12 @@ const initFlightSim = () => {
         },
         label: {
           text: isStart ? route.from : isEnd ? route.to : '',
-          font: '11px sans-serif',
+          font: 'bold 13px sans-serif',
           fillColor: Cesium.Color.WHITE,
           outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 2,
+          outlineWidth: 3,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          pixelOffset: new Cesium.Cartesian2(0, -16),
+          pixelOffset: new Cesium.Cartesian2(0, -18),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
           scaleByDistance: new Cesium.NearFarScalar(500, 1.0, 50000, 0.4),
         },
@@ -1820,8 +2034,57 @@ const initFlightSim = () => {
         } as any,
       })
       wpEntity.show = false
-      return wpEntity
+
+      // 透明大点击区域 (30px)，方便在高空/远处也能点中航路点
+      const wpHitArea = viewer.entities.add({
+        name: displayName,
+        position: Cesium.Cartesian3.fromDegrees(wp[0]!, wp[1]!, route.altitude),
+        point: {
+          pixelSize: 30,
+          color: new Cesium.Color(0, 0, 0, 0), // 完全透明
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        properties: {
+          type: new Cesium.ConstantProperty('flight-waypoint-hitarea'),
+          flightNo: new Cesium.ConstantProperty(route.flightNo),
+          lng: new Cesium.ConstantProperty(wp[0]!.toFixed(4) + '°'),
+          lat: new Cesium.ConstantProperty(wp[1]!.toFixed(4) + '°'),
+          role: new Cesium.ConstantProperty(isStart ? '起飞' : isEnd ? '降落' : '途经'),
+        } as any,
+      }) as Cesium.Entity
+      wpHitArea.show = false
+
+      return { visible: wpEntity, hitArea: wpHitArea }
     })
+
+    // 提取所有航路点实体（包含可见点和点击区域）
+    const allWaypointEntities: Cesium.Entity[] = []
+    waypointEntities.forEach((wp) => {
+      allWaypointEntities.push((wp as any).visible)
+      allWaypointEntities.push((wp as any).hitArea)
+    })
+
+    // 飞机扩大点击区域 — 透明大圆点，方便在高空点击飞机
+    const hitArea = viewer.entities.add({
+      name: route.name,
+      position: positionProperty,
+      orientation: new Cesium.VelocityOrientationProperty(positionProperty),
+      point: {
+        pixelSize: 40,
+        color: new Cesium.Color(0, 0, 0, 0), // 完全透明
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+      properties: {
+        type: new Cesium.ConstantProperty('flight-plane-hitarea'),
+        flightNo: new Cesium.ConstantProperty(route.flightNo),
+        model: new Cesium.ConstantProperty(route.model),
+        from: new Cesium.ConstantProperty(route.from),
+        to: new Cesium.ConstantProperty(route.to),
+        altitude: new Cesium.ConstantProperty(route.altitude + ' m'),
+        speed: new Cesium.ConstantProperty(route.speed + ' km/h'),
+      } as any,
+    }) as Cesium.Entity
+    hitArea.show = false
 
     return {
       id: route.id,
@@ -1838,7 +2101,8 @@ const initFlightSim = () => {
       routeTimes,
       entity: planeEntity,
       trailEntity,
-      waypointEntities,
+      waypointEntities: allWaypointEntities,
+      hitArea, // 点击区域
     }
   })
 
@@ -1865,6 +2129,7 @@ const toggleFlightSim = () => {
     // 显示所有飞机和轨迹
     planes.value.forEach((plane) => {
       if (plane.entity) plane.entity.show = true
+      if (plane.hitArea) plane.hitArea.show = true // 点击区域同步显示
       if (plane.trailEntity && flightShowTrail.value) plane.trailEntity.show = true
       plane.waypointEntities.forEach((wp) => {
         wp.show = true
@@ -1878,6 +2143,7 @@ const toggleFlightSim = () => {
     // 隐藏所有飞机和轨迹
     planes.value.forEach((plane) => {
       if (plane.entity) plane.entity.show = false
+      if (plane.hitArea) plane.hitArea.show = false // 点击区域同步隐藏
       if (plane.trailEntity) plane.trailEntity.show = false
       plane.waypointEntities.forEach((wp) => {
         wp.show = false
@@ -2439,61 +2705,191 @@ $radius: 8px;
     padding: 12px 0;
   }
 
-  // ============ 飞行列表 ============
-  .flight-list {
+  // ============ 飞机浮动面板（右侧面板左侧，高度居中） ============
+  .flight-float-panel {
+    position: absolute;
+    top: 56px;
+    right: 294px; // 右侧面板(280px) + 间距(12px) + 预留间隙(2px)
+    bottom: 44px;
+    width: 300px; //加宽，让内容更舒展
+    background: rgba(22, 27, 34, 0.92);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid $border-color;
+    border-radius: 14px;
+    z-index: 16;
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    margin-top: 6px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
 
-    .flight-item {
+    .flight-panel-header {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.15s;
+      padding: 12px 14px 10px; // 头部内边距加大
+      border-bottom: 1px solid $border-color;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, rgba(108, 92, 231, 0.15), transparent);
 
-      &:hover {
-        background: $bg-hover;
+      .flight-panel-icon {
+        font-size: 14px;
       }
 
-      &.active {
-        background: rgba(108, 92, 231, 0.15);
-      }
-
-      .flight-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex-shrink: 0;
-        animation: pulse-dot 2s infinite;
-      }
-
-      @keyframes pulse-dot {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.4;
-        }
-      }
-
-      .flight-name {
-        flex: 1;
-        font-size: 11px;
+      .flight-panel-title {
+        font-size: 13px;
+        font-weight: 600;
         color: $text-primary;
-        font-weight: 500;
+        letter-spacing: 0.5px;
+        flex: 1;
       }
 
-      .flight-status {
-        font-size: 9px;
-        color: $green;
-        background: rgba(63, 185, 80, 0.15);
-        padding: 1px 6px;
-        border-radius: 3px;
+      .flight-panel-count {
+        font-size: 10px;
+        font-weight: 700;
+        color: #a29bfe;
+        background: rgba(162, 155, 254, 0.15);
+        padding: 2px 8px;
+        border-radius: 8px;
+        min-width: 22px;
+        text-align: center;
+      }
+    }
+
+    .flight-list-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px; // 卡片间距
+
+      &::-webkit-scrollbar {
+        width: 3px;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 2px;
+      }
+
+      .flight-card {
+        width: 100%;
+        background: rgba(108, 92, 231, 0.06);
+        border: 1px solid rgba(162, 155, 254, 0.12);
+        border-radius: 10px;
+        padding: 10px 12px; // 卡片内边距加大
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+
+        &::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          background: var(--card-accent, #6c5ce7);
+          opacity: 0.6;
+          transition: opacity 0.2s;
+        }
+
+        &:hover {
+          background: rgba(108, 92, 231, 0.14);
+          border-color: rgba(162, 155, 254, 0.28);
+          transform: translateX(2px);
+
+          &::before {
+            opacity: 1;
+          }
+        }
+
+        &.active {
+          background: rgba(108, 92, 231, 0.18);
+          border-color: #a29bfe;
+          box-shadow: 0 0 12px rgba(108, 92, 231, 0.3);
+
+          &::before {
+            opacity: 1;
+            box-shadow: 0 0 6px var(--card-accent, #6c5ce7);
+          }
+        }
+
+        .flight-card-header {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          margin-bottom: 6px; // 头部与航线行间距加大
+
+          .flight-dot {
+            width: 9px;
+            height: 9px; // 圆点稍大
+            border-radius: 50%;
+            flex-shrink: 0;
+            box-shadow: 0 0 5px var(--card-accent, #6c5ce7);
+            animation: pulse-dot 2s infinite;
+
+            @keyframes pulse-dot {
+              0%,
+              100% {
+                opacity: 1;
+                transform: scale(1);
+              }
+              50% {
+                opacity: 0.45;
+                transform: scale(0.85);
+              }
+            }
+          }
+
+          .flight-name {
+            flex: 1;
+            font-size: 12px; // 航班号字体稍大
+            color: $text-primary;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .flight-status {
+            font-size: 10px; // 状态字体稍大
+            background: rgba(63, 185, 80, 0.1);
+            padding: 2px 7px; // 内边距加大
+            border-radius: 4px;
+            font-weight: 500;
+            flex-shrink: 0;
+            white-space: nowrap;
+          }
+        }
+
+        .flight-card-route {
+          display: flex;
+          align-items: center;
+          gap: 5px; // 航线行内间距加大
+          padding-left: 16px;
+
+          .route-from,
+          .route-to {
+            font-size: 11px; // 航线文字稍大
+            color: $text-secondary;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .route-to {
+            flex: 1;
+            text-align: right;
+          }
+
+          .route-arrow {
+            color: #a29bfe;
+            font-size: 12px; // 箭头稍大
+            font-weight: bold;
+            letter-spacing: 2px;
+            flex-shrink: 0;
+          }
+        }
       }
     }
   }
@@ -2580,8 +2976,8 @@ $radius: 8px;
 
   // ============ 弹窗 ============
   .popup-overlay {
-    position: absolute;
-    z-index: 25;
+    position: fixed;
+    z-index: 9999;
 
     .popup-card {
       background: rgba(22, 27, 34, 0.95);
