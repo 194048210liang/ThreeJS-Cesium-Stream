@@ -1,0 +1,44 @@
+import { createRouter, createWebHistory } from 'vue-router'
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    {
+      path: '/',
+      name: 'home',
+      component: () => import('../views/home/index.vue'), // component: () => import('../views/HomeView.vue'), 
+    },
+    {
+      path: '/cesium',
+      name: 'cesium',
+      component: () => import('../views/pages/cesium/index.vue'), // component: () => import('../views/CesiumView.vue'), 
+    },
+    {
+      path: '/threejs',
+      name: 'threejs',
+      component: () => import('../views/pages/threejs/index.vue'), // component: () => import('../views/ThreejsView.vue'), 
+    },
+    {
+      path: '/components',
+      name: 'components',
+      component: () => import('../views/pages/zujian/index.vue'), // component: () => import('../views/ZujianView.vue'), 
+    },
+    {
+      path: '/communication',
+      name: 'communication',
+      component: () => import('../views/pages/communicat/index.vue'), // component: () => import('../views/CommunicatView.vue'), 
+    },
+    {
+      path: '/websocket',
+      name: 'websocket',
+      component: () => import('../views/pages/websocket/index.vue'), // component: () => import('../views/WebsocketView.vue'), 
+    },
+    {
+      path: '/konva',
+      name: 'konva',
+      component: () => import('../views/pages/konva/index.vue'), // component: () => import('../views/KonvaView.vue'), 
+    },
+  ],
+})
+
+export default router
