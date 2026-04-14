@@ -1,21 +1,24 @@
 <template>
   <div class="app">
-    <Header v-if="showHeader" class="header" />
-    <router-view />
+    <Header v-if="showHeader" :title="pageTitle" :subtitle="pageSubtitle" />
+    <router-view class="page" :class="{ 'with-header': showHeader }" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
-import Header from '@/components/header.vue';
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import Header from '@/components/header.vue'
 
-const route = useRoute();
+const route = useRoute()
 
-// 只在非首页显示 Header
 const showHeader = computed(() => {
-  return route.path !== '/';
-});
+  return route.path !== '/'
+})
+
+const pageTitle = computed(() => (route.meta?.title as string) || '')
+
+const pageSubtitle = computed(() => (route.meta?.subtitle as string) || '')
 </script>
 
 <style>
@@ -38,14 +41,14 @@ body,
 .app {
   width: 100%;
   height: 100%;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+}
 
-  .header {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    z-index: 100;
-  }
+.page {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 </style>
