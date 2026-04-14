@@ -1,6 +1,6 @@
 <template>
   <div class="dashboard">
-    <!-- 背景粒子网格 -->
+    <!-- 背景 -->
     <div class="bg-grid"></div>
     <div class="bg-glow bg-glow-1"></div>
     <div class="bg-glow bg-glow-2"></div>
@@ -20,13 +20,13 @@
           </div>
         </div>
         <div class="header-title-wrap">
-          <svg class="title-plane" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+          <svg class="title-plane" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
             <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
           </svg>
           <h1 class="header-title">
             <span class="t-char" v-for="(c, i) in '中国民航实时数据监控中心'" :key="i" :style="{ animationDelay: i * 0.08 + 's' }">{{ c }}</span>
           </h1>
-          <svg class="title-plane flip" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+          <svg class="title-plane flip" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
             <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
           </svg>
         </div>
@@ -58,15 +58,24 @@
       <!-- 左栏 -->
       <div class="col col-left">
         <div class="panel" style="flex: 1.1">
-          <div class="panel-head"><span class="ph-dot"></span>航班实时状态</div>
+          <div class="panel-head">
+            <span class="ph-icon" v-html="iconSvg.flight"></span>
+            <span class="ph-dot"></span>航班实时状态
+          </div>
           <div class="panel-body" ref="statusChartRef"></div>
         </div>
         <div class="panel" style="flex: 1">
-          <div class="panel-head"><span class="ph-dot warn"></span>机场吞吐 TOP10</div>
+          <div class="panel-head">
+            <span class="ph-icon" v-html="iconSvg.ranking"></span>
+            <span class="ph-dot warn"></span>机场吞吐 TOP10
+          </div>
           <div class="panel-body" ref="airportChartRef"></div>
         </div>
         <div class="panel" style="flex: 0.85">
-          <div class="panel-head"><span class="ph-dot purple"></span>航司综合能力</div>
+          <div class="panel-head">
+            <span class="ph-icon" v-html="iconSvg.radar"></span>
+            <span class="ph-dot purple"></span>航司综合能力
+          </div>
           <div class="panel-body" ref="airlineChartRef"></div>
         </div>
       </div>
@@ -75,6 +84,7 @@
       <div class="col col-center">
         <div class="panel map-panel">
           <div class="panel-head">
+            <span class="ph-icon" v-html="iconSvg.globe"></span>
             <span class="ph-dot cyan"></span>全国实时航线态势
             <span class="ph-tag">WebSocket</span>
           </div>
@@ -98,15 +108,22 @@
       <!-- 右栏 -->
       <div class="col col-right">
         <div class="panel" style="flex: 1">
-          <div class="panel-head"><span class="ph-dot green"></span>24h 客流趋势</div>
+          <div class="panel-head">
+            <span class="ph-icon" v-html="iconSvg.trend"></span>
+            <span class="ph-dot green"></span>24h 客流趋势
+          </div>
           <div class="panel-body" ref="flowChartRef"></div>
         </div>
         <div class="panel" style="flex: 0.9">
-          <div class="panel-head"><span class="ph-dot gold"></span>在飞机型分布</div>
+          <div class="panel-head">
+            <span class="ph-icon" v-html="iconSvg.plane2"></span>
+            <span class="ph-dot gold"></span>在飞机型分布
+          </div>
           <div class="panel-body" ref="aircraftChartRef"></div>
         </div>
         <div class="panel alerts-panel" style="flex: 0.9">
           <div class="panel-head">
+            <span class="ph-icon" v-html="iconSvg.bell"></span>
             <span class="ph-dot red"></span>实时动态
             <span class="ph-tag sse-tag">SSE</span>
           </div>
@@ -127,6 +144,17 @@
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
+
+// ============ 统一 SVG 图标 ============
+const iconSvg = {
+  flight: '<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>',
+  ranking: '<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M7.5 21H2V9h5.5v12zm7.25-18h-5.5v18h5.5V3zM22 11h-5.5v10H22V11z"/></svg>',
+  radar: '<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M19.07 4.93l-1.41 1.41A8.014 8.014 0 0 1 20 12c0 4.42-3.58 8-8 8s-8-3.58-8-8c0-2.38 1.05-4.52 2.7-5.98L5.28 4.43A9.96 9.96 0 0 0 2 12c0 5.52 4.48 10 10 10s10-4.48 10-10c0-2.92-1.26-5.55-3.26-7.38l-.67-.69zM12 2v6l3.5 2.08-.72 1.21L11 9.27V2h1z"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54A1.99 1.99 0 0 0 16 16h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41A7.997 7.997 0 0 1 20 12c0 2.08-.8 3.97-2.1 5.39z"/></svg>',
+  trend: '<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>',
+  plane2: '<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>',
+}
 
 // ============ Refs ============
 const statusChartRef = ref<HTMLElement | null>(null)
@@ -166,13 +194,13 @@ const updateTime = () => {
     String(d.getHours()).padStart(2,'0'), ':', String(d.getMinutes()).padStart(2,'0'), ':', String(d.getSeconds()).padStart(2,'0')].join('')
 }
 
-// ============ KPI 定义 ============
+// ============ KPI ============
 const kpis = [
   { label: '今日航班总量', color: '#00f0ff', glow: 'radial-gradient(circle, rgba(0,240,255,0.15) 0%, transparent 70%)',
     icon: '<svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>',
     ref: () => stats.todayFlights.toLocaleString(), format: (v: string) => v },
   { label: '在飞航班', color: '#00ff88', glow: 'radial-gradient(circle, rgba(0,255,136,0.12) 0%, transparent 70%)',
-    icon: '<svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
+    icon: '<svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/></svg>',
     ref: () => stats.flying.toLocaleString(), format: (v: string) => v },
   { label: '旅客吞吐量', color: '#ffaa00', glow: 'radial-gradient(circle, rgba(255,170,0,0.1) 0%, transparent 70%)',
     icon: '<svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>',
@@ -243,19 +271,29 @@ const initSSE = () => {
   }, 3500)
 }
 
-// ============ Charts ============
+// ============ Color & Style ============
 const C = { cyan: '#00f0ff', blue: '#3b8bff', green: '#00ff88', gold: '#ffaa00', red: '#ff4466', purple: '#b066ff', pink: '#ff6699', teal: '#00d4aa' }
-const tooltipStyle = { backgroundColor: 'rgba(5,10,25,0.92)', borderColor: 'rgba(0,240,255,0.25)', borderWidth: 1, textStyle: { color: '#c8daf0', fontSize: 12 } }
+const tooltipStyle = { backgroundColor: 'rgba(5,10,25,0.94)', borderColor: 'rgba(0,240,255,0.25)', borderWidth: 1, textStyle: { color: '#c8daf0', fontSize: 12 } }
 
-const initAllCharts = () => {
+// ============ Charts ============
+const initAllCharts = async () => {
+  // 加载中国地图
+  try {
+    const resp = await fetch('/china.json')
+    const chinaJson = await resp.json()
+    echarts.registerMap('china', chinaJson as any)
+  } catch (e) {
+    console.warn('地图加载失败，使用散点图备用', e)
+  }
+
   // 1. 航班状态 - 环形
   if (statusChartRef.value) {
     const c = echarts.init(statusChartRef.value); charts.status = c
     c.setOption({
       tooltip: { ...tooltipStyle, trigger: 'item' },
-      legend: { orient: 'vertical', right: '2%', top: 'center', textStyle: { color: '#6b7fa0', fontSize: 11 }, itemWidth: 10, itemHeight: 10, itemGap: 12 },
+      legend: { orient: 'vertical', right: '4%', top: 'center', textStyle: { color: '#6b7fa0', fontSize: 11 }, itemWidth: 10, itemHeight: 10, itemGap: 14 },
       graphic: [{
-        type: 'text', left: '30%', top: '43%', style: { text: '6,286', fill: '#00f0ff', fontSize: 22, fontWeight: 700, fontFamily: 'DIN, monospace', textAlign: 'center' }
+        type: 'text', left: '30%', top: '43%', style: { text: '6,286', fill: '#00f0ff', fontSize: 24, fontWeight: 700, fontFamily: 'DIN, monospace', textAlign: 'center' }
       }, {
         type: 'text', left: '30%', top: '58%', style: { text: '航班总数', fill: '#6b7fa0', fontSize: 11, textAlign: 'center' }
       }],
@@ -275,25 +313,34 @@ const initAllCharts = () => {
     })
   }
 
-  // 2. 机场排名
+  // 2. 机场排名 - 横向条形图
   if (airportChartRef.value) {
     const c = echarts.init(airportChartRef.value); charts.airport = c
     const names = ['北京首都','上海浦东','广州白云','成都天府','深圳宝安','昆明长水','西安咸阳','重庆江北','杭州萧山','武汉天河']
-    const vals = names.map(() => rand(800,1800)).sort((a,b) => b-a)
+    const vals = names.map(() => rand(800, 1800)).sort((a, b) => b - a)
     c.setOption({
       tooltip: { ...tooltipStyle, trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: '2%', right: '13%', top: '3%', bottom: '3%', containLabel: true },
+      grid: { left: '4%', right: '14%', top: '4%', bottom: '4%', containLabel: true },
       xAxis: { type: 'value', show: false },
-      yAxis: { type: 'category', data: names, inverse: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6b7fa0', fontSize: 11 } },
-      series: [{ type: 'bar', barWidth: 10, data: vals.map((v, i) => ({
-        value: v,
-        itemStyle: {
-          borderRadius: [0, 4, 4, 0],
-          color: i < 3 ? new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:'rgba(0,240,255,0.15)'},{offset:1,color:'#00f0ff'}]) : new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:'rgba(59,139,255,0.1)'},{offset:1,color:'rgba(59,139,255,0.7)'}])
-        }
-      })),
-        label: { show: true, position: 'right', color: '#6b7fa0', fontSize: 10, formatter: '{c}' },
-        animationDuration: 1800, animationEasing: 'cubicOut'
+      yAxis: {
+        type: 'category', data: names, inverse: true,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: '#6b7fa0', fontSize: 11 },
+      },
+      series: [{
+        type: 'bar', barWidth: 12, data: vals.map((v, i) => ({
+          value: v,
+          itemStyle: {
+            borderRadius: [0, 5, 5, 0],
+            color: i < 3
+              ? new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: 'rgba(0,240,255,0.1)' }, { offset: 1, color: '#00f0ff' }]) as any
+              : new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: 'rgba(59,139,255,0.05)' }, { offset: 1, color: 'rgba(59,139,255,0.6)' }]) as any,
+            shadowColor: i < 3 ? 'rgba(0,240,255,0.25)' : 'transparent',
+            shadowBlur: i < 3 ? 8 : 0,
+          }
+        })),
+        label: { show: true, position: 'right', color: '#8899bb', fontSize: 10, fontFamily: 'DIN, monospace', formatter: '{c}' },
+        animationDuration: 1800, animationEasing: 'cubicOut',
       }]
     })
   }
@@ -303,13 +350,13 @@ const initAllCharts = () => {
     const c = echarts.init(airlineChartRef.value); charts.airline = c
     c.setOption({
       tooltip: tooltipStyle,
-      legend: { bottom: 0, textStyle: { color: '#6b7fa0', fontSize: 10 }, itemWidth: 12, itemHeight: 3 },
+      legend: { bottom: 0, textStyle: { color: '#6b7fa0', fontSize: 10 }, itemWidth: 14, itemHeight: 3 },
       radar: {
         indicator: [{name:'运力规模',max:100},{name:'准点率',max:100},{name:'满意度',max:100},{name:'机队规模',max:100},{name:'航线覆盖',max:100},{name:'安全评分',max:100}],
-        shape: 'polygon', splitNumber: 4, radius: '62%', center: ['50%','52%'],
+        shape: 'polygon', splitNumber: 4, radius: '60%', center: ['50%', '52%'],
         axisName: { color: '#556b88', fontSize: 9 },
         splitLine: { lineStyle: { color: 'rgba(0,240,255,0.06)' } },
-        splitArea: { show: true, areaStyle: { color: ['rgba(0,240,255,0.01)','rgba(0,240,255,0.03)'] } },
+        splitArea: { show: true, areaStyle: { color: ['rgba(0,240,255,0.01)', 'rgba(0,240,255,0.03)'] } },
         axisLine: { lineStyle: { color: 'rgba(0,240,255,0.08)' } },
       },
       series: [{ type: 'radar', data: [
@@ -320,82 +367,135 @@ const initAllCharts = () => {
     })
   }
 
-  // 4. 航线地图
+  // 4. 中国地图 + 飞线
   if (mapChartRef.value) {
     const c = echarts.init(mapChartRef.value); charts.map = c
-    const cities: Record<string,[number,number]> = {
-      '北京':[116.4,40.9],'上海':[121.5,31.2],'广州':[113.3,23.1],'成都':[104.1,30.6],'深圳':[114.1,22.5],
-      '昆明':[102.7,25.0],'西安':[108.9,34.3],'重庆':[106.5,29.5],'杭州':[120.2,30.3],'武汉':[114.3,30.6],
-      '南京':[118.8,32.1],'郑州':[113.7,34.8],'长沙':[113.0,28.2],'厦门':[118.1,24.5],'青岛':[120.4,36.1],
-      '大连':[121.6,38.9],'哈尔滨':[126.6,45.7],'乌鲁木齐':[87.6,43.8],'拉萨':[91.1,29.6],'三亚':[109.5,18.3],
-      '贵阳':[106.7,26.6],'福州':[119.3,26.1],'天津':[117.2,39.1],'沈阳':[123.4,41.8],'济南':[117.0,36.7],
-      '南宁':[108.3,22.8],'海口':[110.3,20.0],'兰州':[103.8,36.1],'呼和浩特':[111.7,40.8],'太原':[112.6,37.9],
+    const cities: Record<string, [number, number]> = {
+      '北京': [116.46, 39.92], '上海': [121.48, 31.22], '广州': [113.23, 23.16], '成都': [104.06, 30.67], '深圳': [114.07, 22.62],
+      '昆明': [102.73, 25.04], '西安': [108.95, 34.27], '重庆': [106.54, 29.59], '杭州': [120.19, 30.26], '武汉': [114.31, 30.52],
+      '南京': [118.78, 32.04], '郑州': [113.65, 34.76], '长沙': [112.94, 28.23], '厦门': [118.1, 24.46], '青岛': [120.33, 36.07],
+      '大连': [121.62, 38.92], '哈尔滨': [126.63, 45.75], '乌鲁木齐': [87.68, 43.77], '拉萨': [91.11, 29.97], '三亚': [109.51, 18.25],
+      '贵阳': [106.71, 26.57], '福州': [119.3, 26.08], '天津': [117.2, 39.13], '沈阳': [123.38, 41.8], '济南': [117.0, 36.65],
+      '南宁': [108.33, 22.84], '海口': [110.35, 20.02], '兰州': [103.73, 36.03], '呼和浩特': [111.65, 40.82], '太原': [112.55, 37.87],
     }
-    const hubs = ['北京','上海','广州','成都','深圳']
+    const hubs = ['北京', '上海', '广州', '成都', '深圳']
     const allCities = Object.keys(cities)
     const routes: any[] = []
     const points: any[] = []
+
+    // 生成航线
     hubs.forEach(h => {
       allCities.forEach(d => {
-        if (h !== d && Math.random() > 0.25) {
+        if (h !== d && Math.random() > 0.3) {
           const f = cities[h]!, t = cities[d]!
-          const mx = (f[0]+t[0])/2 + (t[1]-f[1])*0.18
-          const my = (f[1]+t[1])/2 - (t[0]-f[0])*0.12
-          routes.push({ coords: [f, [mx, my], t] })
+          routes.push({ fromName: h, toName: d, coords: [f, t] })
         }
       })
     })
+
+    // 生成城市点
     allCities.forEach(n => {
       const co = cities[n]!, isHub = hubs.includes(n)
-      points.push({ name: n, value: [co[0], co[1], isHub ? rand(200,500) : rand(30,150)],
-        itemStyle: { color: isHub ? C.cyan : C.blue } })
+      points.push({
+        name: n,
+        value: [...co, isHub ? rand(200, 500) : rand(30, 150)],
+        itemStyle: { color: isHub ? '#00f0ff' : '#3b8bff' },
+      })
     })
+
     c.setOption({
-      tooltip: { ...tooltipStyle, trigger: 'item' },
-      xAxis: { type: 'value', min: 75, max: 140, show: false },
-      yAxis: { type: 'value', min: 15, max: 52, show: false },
+      tooltip: { ...tooltipStyle, trigger: 'item', formatter: (p: any) => {
+        if (p.seriesType === 'effectScatter') return `<b>${p.name}</b>`
+        if (p.seriesType === 'lines') return `${p.data.fromName} → ${p.data.toName}`
+        return ''
+      }},
+      geo: {
+        map: 'china',
+        roam: true,
+        zoom: 1.2,
+        center: [104.5, 36],
+        label: { show: false },
+        itemStyle: {
+          areaColor: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(8,30,60,0.9)' },
+              { offset: 1, color: 'rgba(4,16,40,0.95)' },
+            ],
+          } as any,
+          borderColor: 'rgba(0,200,255,0.18)',
+          borderWidth: 1,
+          shadowColor: 'rgba(0,100,200,0.15)',
+          shadowBlur: 20,
+        },
+        emphasis: {
+          itemStyle: {
+            areaColor: 'rgba(0,120,200,0.25)',
+            borderColor: 'rgba(0,240,255,0.5)',
+            borderWidth: 1.5,
+          },
+          label: { show: true, color: '#c0e0ff', fontSize: 11 },
+        },
+      },
       series: [
-        { type: 'lines', coordinateSystem: 'cartesian2d', zlevel: 1,
-          effect: { show: true, period: 4+Math.random()*3, trailLength: 0.25, symbol: 'circle', symbolSize: 3, color: C.cyan },
-          lineStyle: { color: 'rgba(0,240,255,0.12)', width: 0.8, curveness: 0.3 },
-          data: routes.map(r => ({ coords: r.coords }))
+        // 飞线底层 - 细线
+        {
+          type: 'lines', coordinateSystem: 'geo', zlevel: 1,
+          effect: {
+            show: true, period: 4 + Math.random() * 2, trailLength: 0.3,
+            symbol: 'circle', symbolSize: 3, color: '#00f0ff',
+          },
+          lineStyle: { color: 'rgba(0,240,255,0.08)', width: 0.8, curveness: 0.3 },
+          data: routes,
         },
-        { type: 'lines', coordinateSystem: 'cartesian2d', zlevel: 2,
-          effect: { show: true, period: 3+Math.random()*2, trailLength: 0.5, symbol: 'arrow', symbolSize: 5, color: C.gold },
-          lineStyle: { color: 'rgba(255,170,0,0.06)', width: 0.5, curveness: 0.3 },
-          data: routes.slice(0,18).map(r => ({ coords: r.coords }))
+        // 飞线顶层 - 金色重点航线
+        {
+          type: 'lines', coordinateSystem: 'geo', zlevel: 2,
+          effect: {
+            show: true, period: 3 + Math.random() * 2, trailLength: 0.5,
+            symbol: 'arrow', symbolSize: 6, color: '#ffaa00',
+          },
+          lineStyle: { color: 'rgba(255,170,0,0.04)', width: 0.5, curveness: 0.3 },
+          data: routes.slice(0, 20),
         },
-        { type: 'effectScatter', coordinateSystem: 'cartesian2d', zlevel: 3,
-          rippleEffect: { brushType: 'stroke', scale: 4, period: 3 },
-          symbol: 'circle', symbolSize: (v: number[]) => Math.max((v[2]??0)/18, 5),
-          label: { show: true, position: 'right', formatter: '{b}', color: '#8899bb', fontSize: 9, textBorderColor: 'rgba(5,10,25,0.9)', textBorderWidth: 2 },
-          data: points
-        }
-      ]
+        // 城市散点 - 涟漪
+        {
+          type: 'effectScatter', coordinateSystem: 'geo', zlevel: 3,
+          rippleEffect: { brushType: 'stroke', scale: 5, period: 3 },
+          symbol: 'circle',
+          symbolSize: (val: number[]) => Math.max((val[2] ?? 0) / 18, 5),
+          label: {
+            show: true, position: 'right',
+            formatter: '{b}', color: '#8899bb', fontSize: 9,
+            textBorderColor: 'rgba(5,10,25,0.9)', textBorderWidth: 2,
+          },
+          data: points,
+        },
+      ],
     })
   }
 
   // 5. 客流趋势
   if (flowChartRef.value) {
     const c = echarts.init(flowChartRef.value); charts.flow = c
-    const hrs = Array.from({length:24},(_,i)=>`${String(i).padStart(2,'0')}:00`)
-    const gen = () => hrs.map((_,i) => {
-      const b=20, m=80*Math.exp(-0.5*((i-8)/2.5)**2), e=70*Math.exp(-0.5*((i-19)/3)**2)
-      return Math.round(b+m+e+Math.random()*10)
+    const hrs = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)
+    const gen = () => hrs.map((_, i) => {
+      const b = 20, m = 80 * Math.exp(-0.5 * ((i - 8) / 2.5) ** 2), e = 70 * Math.exp(-0.5 * ((i - 19) / 3) ** 2)
+      return Math.round(b + m + e + Math.random() * 10)
     })
-    const dep = gen().map(v => Math.round(v*(0.45+Math.random()*0.1)))
-    const arr = gen().map(v => Math.round(v*(0.45+Math.random()*0.1)))
+    const dep = gen().map(v => Math.round(v * (0.45 + Math.random() * 0.1)))
+    const arr = gen().map(v => Math.round(v * (0.45 + Math.random() * 0.1)))
     c.setOption({
       tooltip: { ...tooltipStyle, trigger: 'axis' },
-      legend: { data: ['出港','进港'], right: 0, top: 0, textStyle: { color: '#6b7fa0', fontSize: 10 }, itemWidth: 12, itemHeight: 3 },
-      grid: { left: '2%', right: '2%', top: '15%', bottom: '2%', containLabel: true },
+      legend: { data: ['出港', '进港'], right: 0, top: 0, textStyle: { color: '#6b7fa0', fontSize: 10 }, itemWidth: 14, itemHeight: 3 },
+      grid: { left: '2%', right: '2%', top: '16%', bottom: '4%', containLabel: true },
       xAxis: { type: 'category', data: hrs, boundaryGap: false, axisLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }, axisTick: { show: false }, axisLabel: { color: '#445566', fontSize: 10, interval: 3 } },
       yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(255,255,255,0.03)' } }, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#445566', fontSize: 10 } },
       series: [
         { name: '出港', type: 'line', smooth: true, symbol: 'none', lineStyle: { color: C.cyan, width: 2, shadowColor: 'rgba(0,240,255,0.3)', shadowBlur: 8 },
-          areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(0,240,255,0.2)'},{offset:1,color:'rgba(0,240,255,0)'}]) }, data: dep },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(0,240,255,0.2)' }, { offset: 1, color: 'rgba(0,240,255,0)' }]) }, data: dep },
         { name: '进港', type: 'line', smooth: true, symbol: 'none', lineStyle: { color: C.green, width: 2, shadowColor: 'rgba(0,255,136,0.3)', shadowBlur: 8 },
-          areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(0,255,136,0.15)'},{offset:1,color:'rgba(0,255,136,0)'}]) }, data: arr },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(0,255,136,0.15)' }, { offset: 1, color: 'rgba(0,255,136,0)' }]) }, data: arr },
       ]
     })
   }
@@ -405,25 +505,25 @@ const initAllCharts = () => {
     const c = echarts.init(aircraftChartRef.value); charts.aircraft = c
     c.setOption({
       tooltip: { ...tooltipStyle, trigger: 'item' },
-      series: [{ type: 'pie', radius: ['15%','70%'], center: ['50%','52%'], roseType: 'area',
+      series: [{ type: 'pie', radius: ['15%', '70%'], center: ['50%', '52%'], roseType: 'area',
         itemStyle: { borderRadius: 5, borderColor: 'rgba(5,10,25,0.8)', borderWidth: 2 },
         label: { color: '#6b7fa0', fontSize: 10, formatter: '{b}\n{d}%' },
         labelLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' }, length: 8, length2: 10 },
         data: [
-          { value: rand(800,1200), name: 'B737-800', itemStyle: { color: C.cyan } },
-          { value: rand(600,900), name: 'A320', itemStyle: { color: C.blue } },
-          { value: rand(300,500), name: 'A321neo', itemStyle: { color: C.green } },
-          { value: rand(200,400), name: 'B787-9', itemStyle: { color: C.gold } },
-          { value: rand(150,300), name: 'A350-900', itemStyle: { color: C.purple } },
-          { value: rand(100,200), name: 'B777-300ER', itemStyle: { color: C.pink } },
-          { value: rand(80,150), name: 'A380-800', itemStyle: { color: C.teal } },
+          { value: rand(800, 1200), name: 'B737-800', itemStyle: { color: C.cyan } },
+          { value: rand(600, 900), name: 'A320', itemStyle: { color: C.blue } },
+          { value: rand(300, 500), name: 'A321neo', itemStyle: { color: C.green } },
+          { value: rand(200, 400), name: 'B787-9', itemStyle: { color: C.gold } },
+          { value: rand(150, 300), name: 'A350-900', itemStyle: { color: C.purple } },
+          { value: rand(100, 200), name: 'B777-300ER', itemStyle: { color: C.pink } },
+          { value: rand(80, 150), name: 'A380-800', itemStyle: { color: C.teal } },
         ]
       }]
     })
   }
 }
 
-// 定时更新图表
+// 定时更新
 let chartTimer: ReturnType<typeof setInterval> | null = null
 const startUpdates = () => {
   chartTimer = setInterval(() => {
@@ -457,7 +557,7 @@ let clockTimer: ReturnType<typeof setInterval> | null = null
 onMounted(async () => {
   updateTime(); clockTimer = setInterval(updateTime, 1000)
   await nextTick()
-  initAllCharts(); initWS(); initSSE(); startUpdates()
+  await initAllCharts(); initWS(); initSSE(); startUpdates()
   window.addEventListener('resize', handleResize)
   setTimeout(() => {
     anim(rand(12800,13200), stats, 'todayFlights')
@@ -480,11 +580,11 @@ onUnmounted(() => {
 <style scoped lang="scss">
 // ============ Variables ============
 $bg: #030810;
-$panel-bg: rgba(6, 14, 30, 0.88);
-$border: rgba(0, 200, 255, 0.08);
-$glow: rgba(0, 240, 255, 0.06);
+$panel-bg: rgba(6, 14, 30, 0.85);
+$border-base: rgba(0, 200, 255, 0.12);
 $txt: #c0d0e4;
 $txt2: #4a6080;
+$accent-cyan: #00f0ff;
 
 // ============ Root ============
 .dashboard {
@@ -494,7 +594,7 @@ $txt2: #4a6080;
   overflow: hidden;
   font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   color: $txt;
-  padding-top: 60px;
+  padding-top: 58px;
   position: relative;
 }
 
@@ -502,22 +602,23 @@ $txt2: #4a6080;
 .bg-grid {
   position: absolute; inset: 0; z-index: 0; pointer-events: none;
   background-image:
-    linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+    linear-gradient(rgba(0,200,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,200,255,0.025) 1px, transparent 1px);
   background-size: 60px 60px;
 }
 .bg-glow {
   position: absolute; z-index: 0; pointer-events: none; border-radius: 50%;
-  &-1 { width: 600px; height: 600px; top: -200px; left: 30%; background: radial-gradient(circle, rgba(0,120,255,0.08) 0%, transparent 70%); }
-  &-2 { width: 500px; height: 500px; bottom: -150px; right: 10%; background: radial-gradient(circle, rgba(0,200,180,0.06) 0%, transparent 70%); }
+  &-1 { width: 700px; height: 700px; top: -250px; left: 25%; background: radial-gradient(circle, rgba(0,120,255,0.07) 0%, transparent 70%); }
+  &-2 { width: 500px; height: 500px; bottom: -150px; right: 5%; background: radial-gradient(circle, rgba(0,200,180,0.05) 0%, transparent 70%); }
 }
 
 // ============ Header ============
 .dash-header {
-  height: 58px; flex-shrink: 0;
+  height: 56px; flex-shrink: 0;
   display: flex; align-items: center;
-  position: relative; z-index: 2;
+  position: absolute; top: 0; left: 0; right: 0; z-index: 10;
   padding: 0 20px;
+  background: linear-gradient(180deg, rgba(3,8,16,0.95) 0%, rgba(3,8,16,0.6) 80%, transparent 100%);
 }
 .header-deco {
   flex: 1; overflow: hidden; opacity: 0.6; height: 2px;
@@ -544,9 +645,7 @@ $txt2: #4a6080;
 }
 @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
 
-.header-title-wrap {
-  display: flex; align-items: center; gap: 12px;
-}
+.header-title-wrap { display: flex; align-items: center; gap: 14px; }
 .title-plane { color: #00f0ff; filter: drop-shadow(0 0 8px rgba(0,240,255,0.6)); animation: floatY 3s ease-in-out infinite; }
 .title-plane.flip { transform: scaleX(-1); animation-delay: 1.5s; }
 @keyframes floatY { 0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)} }
@@ -568,34 +667,38 @@ $txt2: #4a6080;
 .digital-clock {
   font-family: 'DIN', 'Courier New', monospace;
   font-size: 14px; font-weight: 600;
-  color: #00f0ff; letter-spacing: 1px;
+  color: $accent-cyan; letter-spacing: 1px;
   text-shadow: 0 0 10px rgba(0,240,255,0.4);
 }
 
 // ============ KPI Bar ============
 .kpi-bar {
-  height: 76px; flex-shrink: 0;
-  display: flex; gap: 12px;
-  padding: 0 16px; z-index: 2;
-  margin-top: -4px;
+  height: 78px; flex-shrink: 0;
+  display: flex; gap: 14px;
+  padding: 0 20px; z-index: 2;
+  margin-top: 2px;
 }
 .kpi-item {
   flex: 1;
   display: flex; align-items: center; gap: 12px;
   padding: 10px 16px;
   background: linear-gradient(135deg, rgba(8,16,35,0.9), rgba(4,10,25,0.95));
-  border: 1px solid $border;
-  border-radius: 8px;
+  border: 1px solid $border-base;
+  border-radius: 10px;
   position: relative; overflow: hidden;
-  transition: border-color 0.3s, transform 0.3s;
-  &:hover { border-color: rgba(0,200,255,0.2); transform: translateY(-1px); }
+  transition: all 0.3s;
+  &:hover {
+    border-color: rgba(0,200,255,0.25);
+    box-shadow: 0 0 20px rgba(0,200,255,0.08), inset 0 0 20px rgba(0,200,255,0.03);
+    transform: translateY(-2px);
+  }
   .kpi-glow {
     position: absolute; top: -20px; right: -20px;
     width: 80px; height: 80px; opacity: 0.6;
     pointer-events: none;
   }
   .kpi-icon-wrap {
-    width: 38px; height: 38px; border-radius: 10px;
+    width: 40px; height: 40px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
     .kpi-icon { color: inherit; display: flex; }
@@ -603,7 +706,7 @@ $txt2: #4a6080;
   .kpi-content { display: flex; flex-direction: column; gap: 2px; }
   .kpi-value {
     font-family: 'DIN', 'Courier New', monospace;
-    font-size: 20px; font-weight: 700;
+    font-size: 21px; font-weight: 700;
     letter-spacing: 0.5px;
   }
   .kpi-label { font-size: 10px; color: $txt2; letter-spacing: 0.5px; }
@@ -611,81 +714,144 @@ $txt2: #4a6080;
 
 // ============ Body ============
 .dash-body {
-  flex: 1; display: flex; gap: 10px;
-  padding: 0 16px 12px; z-index: 2;
+  flex: 1; display: flex; gap: 14px;
+  padding: 10px 20px 14px; z-index: 2;
   min-height: 0;
 }
-.col { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-.col-left, .col-right { width: 310px; flex-shrink: 0; }
+.col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.col-left, .col-right { width: 340px; flex-shrink: 0; }
 .col-center { flex: 1; min-width: 0; }
 
-// ============ Panel ============
+// ============ Panel - 炫酷边框 ============
 .panel {
   background: $panel-bg;
-  border: 1px solid $border;
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex; flex-direction: column;
   overflow: hidden;
   position: relative;
   backdrop-filter: blur(12px);
-  // 角落装饰
-  &::before, &::after {
-    content: ''; position: absolute; width: 14px; height: 14px; z-index: 1; pointer-events: none;
-  }
+
+  // 流光边框
   &::before {
-    top: -1px; left: -1px;
-    border-top: 2px solid rgba(0,240,255,0.3);
-    border-left: 2px solid rgba(0,240,255,0.3);
+    content: ''; position: absolute; inset: -1px;
+    border-radius: 9px;
+    background: conic-gradient(
+      from var(--border-angle, 0deg),
+      transparent 0%,
+      rgba(0,240,255,0.4) 10%,
+      transparent 20%,
+      transparent 50%,
+      rgba(0,240,255,0.15) 55%,
+      transparent 60%,
+      transparent 80%,
+      rgba(0,200,255,0.3) 88%,
+      transparent 100%
+    );
+    z-index: -1;
+    animation: borderRotate 8s linear infinite;
   }
+
+  // 内层背景
   &::after {
-    bottom: -1px; right: -1px;
-    border-bottom: 2px solid rgba(0,240,255,0.15);
-    border-right: 2px solid rgba(0,240,255,0.15);
+    content: ''; position: absolute; inset: 0;
+    border-radius: 8px;
+    background: $panel-bg;
+    z-index: -1;
+  }
+
+  // 角落发光装饰 - 左上
+  .corner-tl, .corner-tr, .corner-bl, .corner-br {
+    position: absolute; width: 16px; height: 16px; z-index: 2; pointer-events: none;
   }
 }
+
+@keyframes borderRotate {
+  0% { --border-angle: 0deg; }
+  100% { --border-angle: 360deg; }
+}
+
+// 使用 @property 注册 CSS 自定义属性以支持动画
+@property --border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+// 静态发光角落装饰（用 box-shadow 实现）
+.panel {
+  box-shadow:
+    inset 0 0 30px rgba(0,200,255,0.03),
+    0 0 15px rgba(0,100,200,0.05);
+}
+
 .panel-head {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; font-size: 12px; font-weight: 600;
+  padding: 10px 14px; font-size: 12px; font-weight: 600;
   color: #a0b8d0; letter-spacing: 0.5px;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(0,200,255,0.06);
+  background: linear-gradient(90deg, rgba(0,200,255,0.04), transparent 60%);
+  position: relative; z-index: 1;
+  .ph-icon {
+    color: rgba(0,200,255,0.5);
+    display: flex; align-items: center;
+    filter: drop-shadow(0 0 2px rgba(0,200,255,0.3));
+  }
   .ph-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #00f0ff; box-shadow: 0 0 6px rgba(0,240,255,0.5);
-    &.warn { background: #ffaa00; box-shadow: 0 0 6px rgba(255,170,0,0.5); }
-    &.purple { background: #b066ff; box-shadow: 0 0 6px rgba(176,102,255,0.5); }
-    &.green { background: #00ff88; box-shadow: 0 0 6px rgba(0,255,136,0.5); }
-    &.gold { background: #ffaa00; box-shadow: 0 0 6px rgba(255,170,0,0.5); }
-    &.red { background: #ff4466; box-shadow: 0 0 6px rgba(255,68,102,0.5); }
-    &.cyan { background: #00f0ff; box-shadow: 0 0 6px rgba(0,240,255,0.5); }
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #00f0ff; box-shadow: 0 0 8px rgba(0,240,255,0.6), 0 0 2px rgba(0,240,255,0.9);
+    &.warn { background: #ffaa00; box-shadow: 0 0 8px rgba(255,170,0,0.6), 0 0 2px rgba(255,170,0,0.9); }
+    &.purple { background: #b066ff; box-shadow: 0 0 8px rgba(176,102,255,0.6), 0 0 2px rgba(176,102,255,0.9); }
+    &.green { background: #00ff88; box-shadow: 0 0 8px rgba(0,255,136,0.6), 0 0 2px rgba(0,255,136,0.9); }
+    &.gold { background: #ffaa00; box-shadow: 0 0 8px rgba(255,170,0,0.6), 0 0 2px rgba(255,170,0,0.9); }
+    &.red { background: #ff4466; box-shadow: 0 0 8px rgba(255,68,102,0.6), 0 0 2px rgba(255,68,102,0.9); }
+    &.cyan { background: #00f0ff; box-shadow: 0 0 8px rgba(0,240,255,0.6), 0 0 2px rgba(0,240,255,0.9); }
   }
   .ph-tag {
     margin-left: auto; font-size: 9px; font-weight: 600;
-    color: #00f0ff; background: rgba(0,240,255,0.08);
+    color: #00f0ff; background: rgba(0,240,255,0.06);
     border: 1px solid rgba(0,240,255,0.2);
-    padding: 1px 7px; border-radius: 8px; letter-spacing: 0.5px;
-    &.sse-tag { color: #00bbff; background: rgba(0,187,255,0.08); border-color: rgba(0,187,255,0.2); }
+    padding: 2px 8px; border-radius: 8px; letter-spacing: 0.5px;
+    &.sse-tag { color: #00bbff; background: rgba(0,187,255,0.06); border-color: rgba(0,187,255,0.2); }
   }
 }
-.panel-body { flex: 1; min-height: 0; }
-
+.panel-body { flex: 1; min-height: 0; position: relative; z-index: 1; }
 .map-panel { flex: 1 !important; }
 
 // ============ Center Bottom ============
 .center-bottom-row {
-  display: flex; gap: 10px; flex-shrink: 0; height: 72px;
+  display: flex; gap: 14px; flex-shrink: 0; height: 74px;
 }
 .mini-card {
   flex: 1;
   display: flex; align-items: center; gap: 10px;
-  background: $panel-bg; border: 1px solid $border;
-  border-radius: 6px; padding: 10px 14px;
+  background: $panel-bg; border-radius: 8px;
+  padding: 10px 14px;
   position: relative; overflow: hidden;
-  transition: border-color 0.3s;
-  &:hover { border-color: rgba(0,200,255,0.18); }
-  .mc-icon { flex-shrink: 0; display: flex; opacity: 0.8; }
+  transition: all 0.3s;
+  backdrop-filter: blur(8px);
+
+  // 简化流光边框
+  &::before {
+    content: ''; position: absolute; inset: -1px;
+    border-radius: 9px;
+    background: conic-gradient(from var(--border-angle, 0deg), transparent 0%, rgba(0,200,255,0.3) 10%, transparent 20%, transparent 100%);
+    z-index: -1;
+    animation: borderRotate 8s linear infinite;
+    opacity: 0.5;
+  }
+  &::after {
+    content: ''; position: absolute; inset: 0;
+    border-radius: 8px; background: $panel-bg; z-index: -1;
+  }
+
+  &:hover {
+    box-shadow: 0 0 20px rgba(0,200,255,0.08);
+    transform: translateY(-2px);
+  }
+  .mc-icon { flex-shrink: 0; display: flex; opacity: 0.85; }
   .mc-info { flex: 1; display: flex; flex-direction: column; gap: 1px; }
-  .mc-val { font-family: 'DIN', monospace; font-size: 16px; font-weight: 700; }
+  .mc-val { font-family: 'DIN', monospace; font-size: 17px; font-weight: 700; }
   .mc-label { font-size: 10px; color: $txt2; }
   .mc-trend {
     font-size: 10px; font-weight: 600;
@@ -696,14 +862,14 @@ $txt2: #4a6080;
 
 // ============ Alerts ============
 .alerts-scroll {
-  flex: 1; overflow-y: auto; padding: 4px 10px 6px;
-  display: flex; flex-direction: column; gap: 3px;
+  flex: 1; overflow-y: auto; padding: 6px 12px;
+  display: flex; flex-direction: column; gap: 4px;
   &::-webkit-scrollbar { width: 2px; }
   &::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
 }
 .alert-row {
   display: flex; align-items: center; gap: 6px;
-  padding: 5px 8px; border-radius: 4px;
+  padding: 6px 8px; border-radius: 5px;
   font-size: 10px; line-height: 1.3;
   background: rgba(255,255,255,0.015);
   border-left: 2px solid transparent;
@@ -726,8 +892,11 @@ $txt2: #4a6080;
 @keyframes slideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:translateX(0); } }
 
 // ============ Responsive ============
+@media (max-width: 1600px) {
+  .col-left, .col-right { width: 300px; }
+}
 @media (max-width: 1400px) {
-  .col-left, .col-right { width: 270px; }
+  .col-left, .col-right { width: 260px; }
   .kpi-value { font-size: 17px; }
   .header-title { font-size: 18px; letter-spacing: 4px; }
 }
