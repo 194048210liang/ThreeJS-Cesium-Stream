@@ -1,4 +1,4 @@
-# 可视化演示项目
+# cesium | threejs | echarts 演示
 
 基于 **Vue 3 + TypeScript + Vite** 构建的前端可视化学习项目，集成了多种主流可视化技术栈，涵盖 3D 地球、3D 场景、数据图表、实时通信等方向。
 
