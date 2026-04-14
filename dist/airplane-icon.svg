@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- 飞机机身 -->
+  <path d="M32 4 L36 22 L52 30 L36 34 L38 50 L32 44 L26 50 L28 34 L12 30 L28 22 Z" 
+        fill="white" stroke="white" stroke-width="1" stroke-linejoin="round" filter="url(#glow)"/>
+  <!-- 机身中线 -->
+  <line x1="32" y1="8" x2="32" y2="42" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
+</svg>
