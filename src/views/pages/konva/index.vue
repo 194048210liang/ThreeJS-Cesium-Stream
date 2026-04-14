@@ -1,11 +1,9 @@
 <template>
-    <div>
-        <h1>Konva专区</h1>
-    </div>
+  <div>
+    <h1>明天再写。。。。。</h1>
+  </div>
 </template>
 
-<script setup lang="ts">
-
-</script>
+<script setup lang="ts"></script>
 
 <style scoped></style>

@@ -11,6 +11,8 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    BorderCard: typeof import('./src/components/BorderCard.vue')['default']
+    CountUp: typeof import('./src/components/CountUp.vue')['default']
     DialogBox: typeof import('./src/components/DialogBox.vue')['default']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElColorPicker: typeof import('element-plus/es')['ElColorPicker']
@@ -21,8 +23,11 @@ declare module 'vue' {
     ElSwitch: typeof import('element-plus/es')['ElSwitch']
     ElTree: typeof import('element-plus/es')['ElTree']
     Header: typeof import('./src/components/header.vue')['default']
+    ProgressBar: typeof import('./src/components/ProgressBar.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SearchBox: typeof import('./src/components/SearchBox.vue')['default']
+    StatusTag: typeof import('./src/components/StatusTag.vue')['default']
     ThreeScene: typeof import('./src/components/ThreeScene.vue')['default']
   }
 }
