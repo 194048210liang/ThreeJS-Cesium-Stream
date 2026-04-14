@@ -142,7 +142,7 @@
                 <el-slider
                   v-model="explodeDistance"
                   :min="0"
-                  :max="10"
+                  :max="20"
                   :step="0.1"
                   size="small"
                   @input="updateExplode"
@@ -360,6 +360,8 @@ const animationActions = ref<Map<string, THREE.AnimationAction>>(new Map())
 // 拆解
 const explodeDistance = ref(0)
 const originalPositions = new Map<THREE.Object3D, THREE.Vector3>()
+const explodeDirections = new Map<THREE.Object3D, THREE.Vector3>()
+let modelCenter = new THREE.Vector3()
 
 // 场景
 const bgColor = ref('#0d1117')
@@ -772,26 +774,56 @@ const onTreeNodeClick = (data: { name: string; uuid?: string }) => {
 // ============ 模型拆解 ============
 const saveOriginalPositions = (object: THREE.Object3D) => {
   originalPositions.clear()
+  explodeDirections.clear()
+
+  // 计算模型包围盒中心（作为爆炸中心）
+  const box = new THREE.Box3().setFromObject(object)
+  modelCenter = box.getCenter(new THREE.Vector3())
+  const meshList: THREE.Mesh[] = []
+
+  // 收集所有 Mesh 并保存原始位置
   object.traverse((child) => {
     if (child instanceof THREE.Mesh) {
       originalPositions.set(child, child.position.clone())
+      meshList.push(child)
     }
+  })
+
+  // 为每个 Mesh 预计算唯一方向（基于位置 + 随机扰动）
+  const count = meshList.length
+  if (count <= 1) return
+
+  // 使用球面均匀分布 + 基于位置的偏移
+  meshList.forEach((mesh, i) => {
+    const origPos = originalPositions.get(mesh)!
+    const localDir = origPos.clone().sub(modelCenter)
+
+    if (localDir.lengthSq() < 0.001) {
+      // 在原点附近的部件：使用黄金螺旋分布
+      const phi = Math.acos(1 - 2 * (i + 0.5) / count)
+      const theta = Math.PI * (1 + Math.sqrt(5)) * i
+      localDir.set(
+        Math.sin(phi) * Math.cos(theta),
+        Math.abs(Math.sin(phi) * Math.sin(theta)) * 0.8 + 0.2, // 稍微向上偏
+        Math.sin(phi) * Math.sin(theta),
+      )
+    }
+
+    localDir.normalize()
+    explodeDirections.set(mesh, localDir)
   })
 }
 
 const updateExplode = () => {
   if (!currentModel) return
 
-  const center = new THREE.Vector3()
   currentModel.traverse((child) => {
     if (child instanceof THREE.Mesh) {
       const orig = originalPositions.get(child)
-      if (orig) {
-        const direction = orig.clone().sub(center).normalize()
-        if (direction.length() === 0) {
-          direction.set(Math.random() - 0.5, 1, Math.random() - 0.5).normalize()
-        }
-        child.position.copy(orig.clone().add(direction.multiplyScalar(explodeDistance.value)))
+      const dir = explodeDirections.get(child)
+      if (orig && dir) {
+        // 沿预计算方向偏移
+        child.position.copy(orig).add(dir.clone().multiplyScalar(explodeDistance.value))
       }
     }
   })
@@ -803,7 +835,7 @@ const resetExplode = () => {
 }
 
 const doExplode = () => {
-  explodeDistance.value = 5
+  explodeDistance.value = 10
   updateExplode()
 }
 
