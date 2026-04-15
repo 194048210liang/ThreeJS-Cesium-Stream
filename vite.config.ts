@@ -9,14 +9,22 @@ export default defineConfig({
   plugins: [
     vue(),
     Components({
-      resolvers: [ElementPlusResolver()],
+      resolvers: [ElementPlusResolver({ importStyle: 'sass' })],
     }),
-    cesium(), // 引入cesesium插件
+    cesium(),
   ],
   base: './',
   build: {
-    outDir: 'dist', // 构建输出目录
-    assetsDir: 'assets', // 静态资源目录
+    outDir: 'dist',
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('echarts')) return 'echarts'
+          if (id.includes('element-plus')) return 'element-plus'
+        },
+      },
+    },
   },
   resolve: {
     alias: {

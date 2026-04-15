@@ -117,6 +117,22 @@ export const useEditorStore = defineStore('editor', () => {
   // 当前选中组件ID
   const selectedId = ref<string | null>(null)
 
+  // 组件 zIndex 映射表（避免每次渲染 O(n) indexOf）
+  const zIndexMap = computed(() => {
+    const map = new Map<string, number>()
+    components.value.forEach((c, i) => map.set(c.id, i + 1))
+    return map
+  })
+
+  // debounce 工具
+  function debounce<T extends (...args: any[]) => void>(fn: T, ms: number) {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    return (...args: Parameters<T>) => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => fn(...args), ms)
+    }
+  }
+
   // 当前选中组件
   const selectedComponent = computed(() =>
     components.value.find((c) => c.id === selectedId.value) || null,
@@ -275,6 +291,10 @@ export const useEditorStore = defineStore('editor', () => {
     components,
     selectedId,
     selectedComponent,
+    zIndexMap,
+    snapshots,
+    snapshotIndex,
+    debounce,
     recordSnapshot,
     undo,
     redo,

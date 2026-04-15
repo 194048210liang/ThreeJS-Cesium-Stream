@@ -420,7 +420,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   RefreshLeft,
@@ -458,6 +458,12 @@ import LineChart from './components/LineChart.vue'
 import BorderCard from '@/components/BorderCard.vue'
 import DialogBox from '@/components/DialogBox.vue'
 import DataVBorder from './components/DataVBorder.vue'
+
+// 异步组件用于预览模式（减少初始包体积）
+const AsyncBarChart = defineAsyncComponent(() => import('./components/BarChart.vue'))
+const AsyncColumnChart = defineAsyncComponent(() => import('./components/ColumnChart.vue'))
+const AsyncPieChart = defineAsyncComponent(() => import('./components/PieChart.vue'))
+const AsyncLineChart = defineAsyncComponent(() => import('./components/LineChart.vue'))
 
 const borderOptions: { label: string; value: BorderType }[] = [
   { label: '无边框', value: '' },
@@ -567,14 +573,14 @@ function onCanvasMouseDown(e: MouseEvent) {
   }
 }
 
-// 样式
+// 样式（用 zIndexMap 替代 O(n) 的 indexOf）
 function shapeStyle(comp: IComponent) {
   return {
     left: comp.x + 'px',
     top: comp.y + 'px',
     width: comp.w + 'px',
     height: comp.h + 'px',
-    zIndex: store.components.indexOf(comp) + 1,
+    zIndex: store.zIndexMap.get(comp.id) ?? 1,
   }
 }
 
@@ -584,6 +590,7 @@ let dragStartX = 0,
   dragStartY = 0,
   compStartX = 0,
   compStartY = 0
+let rafId = 0
 
 function onShapeMouseDown(e: MouseEvent, comp: IComponent) {
   if (comp.locked) return
@@ -599,40 +606,46 @@ function onShapeMouseDown(e: MouseEvent, comp: IComponent) {
 
 function onMouseMove(e: MouseEvent) {
   if (!isDragging || !store.selectedComponent) return
-  let nx = compStartX + (e.clientX - dragStartX)
-  let ny = compStartY + (e.clientY - dragStartY)
-  const sc = store.selectedComponent
+  if (rafId) return // rAF 节流：跳过上一帧未完成的更新
+  rafId = requestAnimationFrame(() => {
+    rafId = 0
+    const sc = store.selectedComponent
+    if (!sc || !isDragging) return
+    let nx = compStartX + (e.clientX - dragStartX)
+    let ny = compStartY + (e.clientY - dragStartY)
 
-  guideLines.value = calcGuideLines(sc, nx, ny)
+    guideLines.value = calcGuideLines(sc, nx, ny)
 
-  // 吸附
-  guideLines.value.forEach((line) => {
-    if (line.type === 'v') {
-      const points = [nx, nx + sc.w / 2, nx + sc.w]
-      for (const p of points) {
-        if (Math.abs(p - line.pos) < SNAP_THRESHOLD) {
-          nx += line.pos - p
-          break
+    // 吸附
+    guideLines.value.forEach((line) => {
+      if (line.type === 'v') {
+        const points = [nx, nx + sc.w / 2, nx + sc.w]
+        for (const p of points) {
+          if (Math.abs(p - line.pos) < SNAP_THRESHOLD) {
+            nx += line.pos - p
+            break
+          }
+        }
+      } else {
+        const points = [ny, ny + sc.h / 2, ny + sc.h]
+        for (const p of points) {
+          if (Math.abs(p - line.pos) < SNAP_THRESHOLD) {
+            ny += line.pos - p
+            break
+          }
         }
       }
-    } else {
-      const points = [ny, ny + sc.h / 2, ny + sc.h]
-      for (const p of points) {
-        if (Math.abs(p - line.pos) < SNAP_THRESHOLD) {
-          ny += line.pos - p
-          break
-        }
-      }
-    }
+    })
+
+    sc.x = Math.max(0, Math.min(Math.round(nx), store.canvasStyle.width - sc.w))
+    sc.y = Math.max(0, Math.min(Math.round(ny), store.canvasStyle.height - sc.h))
   })
-
-  sc.x = Math.max(0, Math.min(Math.round(nx), store.canvasStyle.width - sc.w))
-  sc.y = Math.max(0, Math.min(Math.round(ny), store.canvasStyle.height - sc.h))
 }
 
 function onMouseUp() {
   if (isDragging) {
     isDragging = false
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0 }
     guideLines.value = []
     store.recordSnapshot()
   }
@@ -664,6 +677,7 @@ let resizeHandle: string | null = null
 let resizeStartX = 0,
   resizeStartY = 0
 let resizeStartComp: { x: number; y: number; w: number; h: number } | null = null
+let resizeRafId = 0
 
 function onHandleMouseDown(e: MouseEvent, comp: IComponent, handle: { pos: string }) {
   if (comp.locked) return
@@ -678,72 +692,78 @@ function onHandleMouseDown(e: MouseEvent, comp: IComponent, handle: { pos: strin
 
 function onResizeMove(e: MouseEvent) {
   if (!isResizing || !resizeStartComp || !store.selectedComponent) return
-  const dx = e.clientX - resizeStartX,
-    dy = e.clientY - resizeStartY
-  const s = resizeStartComp,
-    c = store.selectedComponent
-  const minW = 120,
-    minH = 80
-  let nx = s.x,
-    ny = s.y,
-    nw = s.w,
-    nh = s.h
+  if (resizeRafId) return
+  resizeRafId = requestAnimationFrame(() => {
+    resizeRafId = 0
+    if (!isResizing || !resizeStartComp || !store.selectedComponent) return
+    const dx = e.clientX - resizeStartX,
+      dy = e.clientY - resizeStartY
+    const s = resizeStartComp,
+      c = store.selectedComponent
+    const minW = 120,
+      minH = 80
+    let nx = s.x,
+      ny = s.y,
+      nw = s.w,
+      nh = s.h
 
-  switch (resizeHandle) {
-    case 'tl':
-      nx = s.x + dx
-      ny = s.y + dy
-      nw = s.w - dx
-      nh = s.h - dy
-      break
-    case 'tm':
-      ny = s.y + dy
-      nh = s.h - dy
-      break
-    case 'tr':
-      ny = s.y + dy
-      nw = s.w + dx
-      nh = s.h - dy
-      break
-    case 'ml':
-      nx = s.x + dx
-      nw = s.w - dx
-      break
-    case 'mr':
-      nw = s.w + dx
-      break
-    case 'bl':
-      nx = s.x + dx
-      nw = s.w - dx
-      nh = s.h + dy
-      break
-    case 'bm':
-      nh = s.h + dy
-      break
-    case 'br':
-      nw = s.w + dx
-      nh = s.h + dy
-      break
-  }
-  if (nw < minW) {
-    if (resizeHandle?.startsWith('t') || resizeHandle === 'ml') nx = s.x + s.w - minW
-    nw = minW
-  }
-  if (nh < minH) {
-    if (resizeHandle?.startsWith('l') || resizeHandle === 'tm') ny = s.y + s.h - minH
-    nh = minH
-  }
+    switch (resizeHandle) {
+      case 'tl':
+        nx = s.x + dx
+        ny = s.y + dy
+        nw = s.w - dx
+        nh = s.h - dy
+        break
+      case 'tm':
+        ny = s.y + dy
+        nh = s.h - dy
+        break
+      case 'tr':
+        ny = s.y + dy
+        nw = s.w + dx
+        nh = s.h - dy
+        break
+      case 'ml':
+        nx = s.x + dx
+        nw = s.w - dx
+        break
+      case 'mr':
+        nw = s.w + dx
+        break
+      case 'bl':
+        nx = s.x + dx
+        nw = s.w - dx
+        nh = s.h + dy
+        break
+      case 'bm':
+        nh = s.h + dy
+        break
+      case 'br':
+        nw = s.w + dx
+        nh = s.h + dy
+        break
+    }
+    if (nw < minW) {
+      if (resizeHandle?.startsWith('t') || resizeHandle === 'ml') nx = s.x + s.w - minW
+      nw = minW
+    }
+    if (nh < minH) {
+      if (resizeHandle?.startsWith('l') || resizeHandle === 'tm') ny = s.y + s.h - minH
+      nh = minH
+    }
 
-  c.x = Math.round(nx)
-  c.y = Math.round(ny)
-  c.w = Math.round(nw)
-  c.h = Math.round(nh)
+    c.x = Math.round(nx)
+    c.y = Math.round(ny)
+    c.w = Math.round(nw)
+    c.h = Math.round(nh)
+  })
 }
 
 function onResizeUp() {
   if (isResizing) {
     isResizing = false
     resizeHandle = null
+    if (resizeRafId) { cancelAnimationFrame(resizeRafId); resizeRafId = 0 }
     store.recordSnapshot()
   }
   document.removeEventListener('mousemove', onResizeMove)
@@ -861,8 +881,10 @@ function updateProp(key: string, val: any) {
   }
 }
 
+// debounce 快照记录，避免属性面板快速操作时产生大量快照
+const debouncedRecordSnapshot = store.debounce(() => store.recordSnapshot(), 300)
 function recordAfterChange() {
-  nextTick(() => store.recordSnapshot())
+  nextTick(() => debouncedRecordSnapshot())
 }
 
 // ========== 发布 ==========
@@ -918,11 +940,18 @@ onUnmounted(() => {
   justify-content: space-between;
   padding: 0 20px;
   background: linear-gradient(180deg, rgba(14, 28, 48, 0.95), rgba(10, 20, 36, 0.98));
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border-bottom: 1px solid rgba(0, 160, 255, 0.12);
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(0, 160, 255, 0.06) inset;
   box-sizing: border-box;
   z-index: 100;
+}
+@media (max-width: 768px) {
+  .toolbar {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 .toolbar-left,
 .toolbar-right {
@@ -1311,9 +1340,14 @@ onUnmounted(() => {
   align-items: center;
   padding: 0 20px;
   background: linear-gradient(180deg, rgba(14, 28, 48, 0.95), rgba(10, 20, 36, 0.98));
-  backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(0, 160, 255, 0.12);
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+}
+@media (max-width: 768px) {
+  .preview-toolbar {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 .preview-wrapper {
   flex: 1;

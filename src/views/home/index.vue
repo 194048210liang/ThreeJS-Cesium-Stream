@@ -221,17 +221,19 @@ const initParticles = () => {
       ctx.fill()
     })
 
-    // 连线
+    // 连线（用距离平方避免 Math.sqrt）
+    const maxDist = 120
+    const maxDist2 = maxDist * maxDist
     for (let i = 0; i < particles.length; i++) {
       for (let j = i + 1; j < particles.length; j++) {
         const dx = particles[i].x - particles[j].x
         const dy = particles[i].y - particles[j].y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist < 120) {
+        const dist2 = dx * dx + dy * dy
+        if (dist2 < maxDist2) {
           ctx.beginPath()
           ctx.moveTo(particles[i].x, particles[i].y)
           ctx.lineTo(particles[j].x, particles[j].y)
-          ctx.strokeStyle = `rgba(0, 140, 255, ${0.15 * (1 - dist / 120)})`
+          ctx.strokeStyle = `rgba(0, 140, 255, ${0.15 * (1 - dist2 / maxDist2)})`
           ctx.lineWidth = 0.5
           ctx.stroke()
         }

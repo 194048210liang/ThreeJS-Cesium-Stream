@@ -10,6 +10,7 @@ const props = defineProps<{ propValue: any }>()
 const chartRef = ref<HTMLElement>()
 let chart: echarts.ECharts | null = null
 let ro: ResizeObserver
+let resizeTimer: ReturnType<typeof setTimeout> | null = null
 
 function render() {
   if (!chartRef.value) return
@@ -35,10 +36,13 @@ function render() {
 watch(() => props.propValue, render, { deep: true })
 onMounted(() => {
   render()
-  ro = new ResizeObserver(() => chart?.resize())
+  ro = new ResizeObserver(() => {
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => chart?.resize(), 100)
+  })
   if (chartRef.value) ro.observe(chartRef.value)
 })
-onUnmounted(() => { chart?.dispose(); ro?.disconnect() })
+onUnmounted(() => { chart?.dispose(); ro?.disconnect(); if (resizeTimer) clearTimeout(resizeTimer) })
 </script>
 
 <style scoped>
