@@ -1,57 +1,57 @@
-# Cesium | Three.js | ECharts Demo
+# Cesium | Three.js | ECharts 演示
 
-[![Live Demo](https://img.shields.io/badge/Demo-Live%20Preview-blue?style=for-the-badge&logo=cloudflare)](https://threejs-cesium-stream.pages.dev)
-[![中文文档](https://img.shields.io/badge/文档-中文-blue)](README.zh-CN.md)
+[![在线演示](https://img.shields.io/badge/演示-在线预览-blue?style=for-the-badge&logo=cloudflare)](https://threejs-cesium-stream.pages.dev)
+[![English](https://img.shields.io/badge/文档-English-blue)](README.en.md)
 
-A front-end visualization learning project built with **Vue 3 + TypeScript + Vite**, integrating multiple mainstream visualization tech stacks covering 3D globe, 3D scenes, data charts, real-time communication, and low-code editor.
+基于 **Vue 3 + TypeScript + Vite** 构建的前端可视化学习项目，集成了多种主流可视化技术栈，涵盖 3D 地球、3D 场景、数据图表、实时通信、低代码编辑器等方向。
 
-## Tech Stack
+## 技术栈
 
-- **Framework**: Vue 3 + TypeScript + Pinia + Vue Router
-- **Build**: Vite + SCSS
-- **Visualization**: Cesium (3D Globe), Three.js (3D Scenes), ECharts (Data Charts)
-- **UI**: Element Plus
-- **Communication**: WebSocket / SSE real-time data push
+- **框架**：Vue 3 + TypeScript + Pinia + Vue Router
+- **构建**：Vite + SCSS
+- **可视化**：Cesium（3D 地球）、Three.js（3D 场景）、ECharts（数据图表）
+- **UI**：Element Plus
+- **通信**：WebSocket / SSE 实时数据推送
 
-## Page Preview
+## 页面预览
 
-### Home
+### 主页
 
-![Home](src/assets/home.png)
+![主页](src/assets/home.png)
 
-### Cesium — 3D Globe Visualization
+### Cesium — 3D 地球可视化
 
 ![Cesium 1](src/assets/cesium.png)
 ![Cesium 2](src/assets/cesium2.png)
 ![Cesium 3](src/assets/cesium3.png)
 
-### Three.js — 3D Scene Rendering
+### Three.js — 3D 场景渲染
 
 ![Three.js](src/assets/threejs.png)
 
-### ECharts — Data Dashboard
+### ECharts — 数据图表面板
 
 ![ECharts](src/assets/dp.png)
 
-### WebSocket — Real-time Data Dashboard
+### WebSocket — 实时数据大屏
 
-Aviation situation awareness dashboard based on WebSocket/SSE real-time data push, featuring flight statistics donut charts, route bar charts, city rankings, and real-time dynamic lists.
+基于 WebSocket/SSE 实时数据推送的航空态势监控大屏，包含航班统计环形图、航线柱状图、城市排名、实时动态列表等模块。
 
-### Low-Code Editor
+### 低代码编辑器
 
-A drag-and-drop visual editor supporting ECharts charts, data tables, text blocks, and image components. Features include component layering, canvas zoom, undo/redo, and publish/preview.
+支持拖拽的可视化编辑器，内置 ECharts 图表、数据表格、文本块、图片组件。支持组件层级管理、画布缩放、撤销重做、发布预览。
 
-## Quick Start
+## 快速开始
 
 ```bash
-# Install dependencies
+# 安装依赖
 npm install
 
-# Start dev server
+# 启动开发服务器
 npm run dev
 
-# Build for production
+# 构建生产版本
 npm run build
 ```
 
-> Requires Node.js >= 20.19.0
+> 需要 Node.js >= 20.19.0
