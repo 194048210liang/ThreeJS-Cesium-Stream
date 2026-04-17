@@ -60,7 +60,7 @@
           <div class="panel-head">
             <span class="ph-icon" v-html="iconSvg.globe"></span>
             <span class="ph-dot cyan"></span>全国实时航线态势
-            <span class="ph-tag">WebSocket</span>
+            <span class="ph-tag">OpenSky ADS-B</span>
           </div>
           <div class="panel-body" ref="mapChartRef"></div>
         </div>
@@ -118,6 +118,12 @@
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
+import {
+  fetchChinaFlights,
+  findNearestAirport,
+  getAirlineName,
+  type FlightState,
+} from '@/api/opensky'
 
 // ============ 统一 SVG 图标 ============
 const iconSvg = {
@@ -152,6 +158,10 @@ const stats = reactive({ todayFlights: 0, flying: 0, passengers: 0, onTime: 0 })
 const metrics = reactive({ domestic: 0, intl: 0, delay: 0, cancel: 0 })
 const alerts = ref<{ time: string; icon: string; text: string; type: string }[]>([])
 let charts: Record<string, ECharts | null> = {}
+
+// ====== OpenSky 实时数据 ======
+const realFlights = ref<FlightState[]>([])
+let realDataTimer: ReturnType<typeof setInterval> | null = null
 
 // ============ Utils ============
 const rand = (a: number, b: number) => Math.floor(Math.random() * (b - a + 1)) + a
@@ -260,13 +270,16 @@ const initWS = () => {
   wsConnected.value = true
   wsTimer = setInterval(() => {
     anim(rand(12800, 13600), stats, 'todayFlights')
-    anim(rand(3200, 3900), stats, 'flying')
     anim(rand(185, 215), stats, 'passengers')
     anim(randf(78, 93), stats, 'onTime', 1)
     anim(rand(3400, 3700), metrics, 'domestic')
     anim(rand(850, 950), metrics, 'intl')
     anim(rand(12, 30), metrics, 'delay')
     anim(rand(15, 65), metrics, 'cancel')
+    // flying 由 refreshRealData 从 OpenSky 实时更新，无数据时回退模拟
+    if (realFlights.value.length === 0) {
+      anim(rand(3200, 3900), stats, 'flying')
+    }
   }, 3000)
 }
 
@@ -735,6 +748,18 @@ const initAllCharts = async () => {
           },
           data: points,
         },
+        // 实时航班位置 - OpenSky ADS-B
+        {
+          name: 'realAircraft',
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          zlevel: 4,
+          symbol: 'circle',
+          symbolSize: 3,
+          itemStyle: { color: '#ffffff', opacity: 0.7 },
+          label: { show: false },
+          data: [],
+        },
       ],
     })
   }
@@ -951,6 +976,66 @@ const startUpdates = () => {
 
 const handleResize = () => Object.values(charts).forEach((c) => c?.resize())
 
+// ============ OpenSky 实时数据刷新 ============
+const refreshRealData = async () => {
+  try {
+    const { flights, total } = await fetchChinaFlights()
+    realFlights.value = flights
+
+    // 更新 KPI「在飞航班」
+    anim(total, stats, 'flying')
+
+    // 更新地图散点 - 真实航班位置
+    if (charts.map) {
+      const scatterData = flights.slice(0, 600).map((f) => ({
+        value: [f.longitude, f.latitude, f.altitude],
+        itemStyle: {
+          color: f.altitude > 10000 ? '#ffffff' : '#66ccff',
+          opacity: 0.75,
+        },
+      }))
+      // 只更新 index=3 的 realAircraft series，不影响其他 series
+      const seriesOption = charts.map.getOption() as any
+      const allSeries = seriesOption?.series || []
+      allSeries[3] = { ...allSeries[3], data: scatterData }
+      charts.map.setOption({ series: allSeries })
+    }
+
+    // 用真实航班号生成动态消息
+    const count = Math.min(3, flights.length)
+    for (let i = 0; i < count; i++) {
+      const f = flights[rand(0, flights.length - 1)]!
+      const airport = findNearestAirport(f.latitude, f.longitude)
+      const airline = getAirlineName(f.callsign)
+      const alt = Math.round(f.altitude * 3.2808)
+      const spd = Math.round(f.velocity * 3.6)
+      const n = new Date()
+      const time = `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}:${String(n.getSeconds()).padStart(2, '0')}`
+
+      const msgs = [
+        { text: `${airline}${f.callsign} ${airport}附近 巡航高度${alt}ft`, type: 'info' as const },
+        { text: `${airline}${f.callsign} 途径${airport} 空速${spd}km/h`, type: 'info' as const },
+        { text: `${airline}${f.callsign} 接近${airport} 高度${alt}ft 开始下降`, type: 'success' as const },
+        { text: `${airline}${f.callsign} ${airport}上空 真航迹${Math.round(f.heading)}°`, type: 'info' as const },
+      ]
+      const msg = msgs[rand(0, msgs.length - 1)]!
+      alerts.value.unshift({
+        time,
+        icon: msg.type === 'success' ? '✓' : '✈',
+        text: msg.text,
+        type: msg.type,
+      })
+    }
+    if (alerts.value.length > 50) alerts.value = alerts.value.slice(0, 50)
+  } catch (e) {
+    console.warn('OpenSky 数据获取失败，使用模拟数据:', e)
+    // API 失败时回退模拟「在飞航班」
+    if (realFlights.value.length === 0) {
+      anim(rand(3200, 3900), stats, 'flying')
+    }
+  }
+}
+
 let clockTimer: ReturnType<typeof setInterval> | null = null
 onMounted(async () => {
   updateTime()
@@ -960,10 +1045,12 @@ onMounted(async () => {
   initWS()
   initSSE()
   startUpdates()
+  refreshRealData()
+  realDataTimer = setInterval(refreshRealData, 12000)
   window.addEventListener('resize', handleResize)
   setTimeout(() => {
     anim(rand(12800, 13200), stats, 'todayFlights')
-    anim(rand(3200, 3600), stats, 'flying')
+    // flying 等待 OpenSky 数据返回后由 refreshRealData 设置
     anim(rand(185, 200), stats, 'passengers')
     anim(randf(82, 90), stats, 'onTime', 1)
     anim(rand(3400, 3600), metrics, 'domestic')
@@ -973,7 +1060,7 @@ onMounted(async () => {
   }, 200)
 })
 onUnmounted(() => {
-  ;[clockTimer, wsTimer, sseTimer, chartTimer].forEach((t) => t && clearInterval(t))
+  ;[clockTimer, wsTimer, sseTimer, chartTimer, realDataTimer].forEach((t) => t && clearInterval(t))
   window.removeEventListener('resize', handleResize)
   Object.values(charts).forEach((c) => c?.dispose())
   charts = {}

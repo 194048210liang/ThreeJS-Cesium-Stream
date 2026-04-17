@@ -30,7 +30,6 @@ declare module 'vue' {
     ElSwitch: typeof import('element-plus/es')['ElSwitch']
     ElTable: typeof import('element-plus/es')['ElTable']
     ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
-    ElTooltip: typeof import('element-plus/es')['ElTooltip']
     ElTree: typeof import('element-plus/es')['ElTree']
     Header: typeof import('./src/components/header.vue')['default']
     ProgressBar: typeof import('./src/components/ProgressBar.vue')['default']
@@ -38,6 +37,5 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SearchBox: typeof import('./src/components/SearchBox.vue')['default']
     StatusTag: typeof import('./src/components/StatusTag.vue')['default']
-    ThreeScene: typeof import('./src/components/ThreeScene.vue')['default']
   }
 }

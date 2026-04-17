@@ -14,6 +14,15 @@ export default defineConfig({
     cesium(),
   ],
   base: './',
+  server: {
+    proxy: {
+      '/opensky': {
+        target: 'https://opensky-network.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/opensky/, ''),
+      },
+    },
+  },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',

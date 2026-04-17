@@ -11,7 +11,7 @@ node_modules
 .DS_Store
 coverage
 *.local
-
+dist
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

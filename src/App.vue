@@ -13,7 +13,7 @@ import Header from '@/components/header.vue'
 const route = useRoute()
 
 const showHeader = computed(() => {
-  return route.path !== '/'
+  return route.path !== '/' && route.name !== 'not-found'
 })
 
 const pageTitle = computed(() => (route.meta?.title as string) || '')
