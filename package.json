@@ -14,6 +14,7 @@
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
     "@kjgl77/datav-vue3": "^1.7.4",
+    "axios": "^1.15.0",
     "cesium": "^1.140.0",
     "echarts": "^6.0.0",
     "element-plus": "^2.13.6",
