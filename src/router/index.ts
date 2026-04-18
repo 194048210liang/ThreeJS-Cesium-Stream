@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { UAParser } from 'ua-parser-js'
 import { reportVisit } from '@/api/visitor'
 
 const router = createRouter({
@@ -58,19 +59,16 @@ router.afterEach((to) => {
   reportVisit(to.path, getBrowser(), getDevice())
 })
 
+const parser = new UAParser()
+
 function getBrowser(): string {
-  const ua = navigator.userAgent
-  if (ua.includes('Edg/')) return 'Edge'
-  if (ua.includes('Chrome/')) return 'Chrome'
-  if (ua.includes('Safari/') && !ua.includes('Chrome')) return 'Safari'
-  if (ua.includes('Firefox/')) return 'Firefox'
-  return 'Other'
+  return parser.getBrowser().name || 'Other'
 }
 
 function getDevice(): string {
-  const ua = navigator.userAgent
-  if (/Android|iPhone|iPad|iPod/i.test(ua)) return 'Mobile'
-  if (/iPad|Tablet/i.test(ua)) return 'Tablet'
+  const type = parser.getDevice().type
+  if (type === 'tablet') return 'Tablet'
+  if (type === 'mobile') return 'Mobile'
   return 'Desktop'
 }
 

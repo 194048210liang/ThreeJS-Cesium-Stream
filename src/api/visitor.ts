@@ -19,7 +19,16 @@ export function reportVisit(page: string, browser: string, device: string) {
   }
 }
 
+interface VisitorStatsParams {
+  /** 日期范围起始 YYYY-MM-DD，不传则不限制 */
+  start?: string
+  /** 日期范围结束 YYYY-MM-DD，不传则不限制 */
+  end?: string
+  /** 最近访问记录条数，默认 100 */
+  limit?: number
+}
+
 /** 获取访客统计数据 */
-export function getVisitorStats() {
-  return request.get(API_BASE)
+export function getVisitorStats(params?: VisitorStatsParams) {
+  return request.get(API_BASE, { params })
 }

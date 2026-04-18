@@ -103,15 +103,22 @@
               :cell-style="cellStyle"
               stripe
             >
-              <el-table-column prop="time" label="时间" />
+              <el-table-column prop="time" label="时间" width="150" />
               <el-table-column prop="page" label="页面" />
-              <el-table-column prop="ip" label="IP" />
+              <el-table-column prop="ip" label="IP" width="280" />
               <el-table-column prop="country" label="地区" />
               <el-table-column prop="region" label="省份">
                 <template #default="{ row }">{{ row.region || '未知' }}</template>
               </el-table-column>
               <el-table-column prop="browser" label="浏览器" />
             </el-table>
+            <div v-if="isLoadingMore" class="load-more-hint">加载中...</div>
+            <div v-else-if="recentHasMore" class="load-more-hint">
+              已加载 {{ recentVisits.length }} 条，滚动加载更多...
+            </div>
+            <div v-else-if="recentTotal > recentPageSize" class="load-more-hint done">
+              已加载全部 {{ recentVisits.length }} 条记录
+            </div>
           </div>
         </div>
       </div>
@@ -120,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { getVisitorStats } from '@/api/visitor'
@@ -195,6 +202,85 @@ const recentVisits = ref<
   { time: string; page: string; ip: string; country: string; region: string; browser: string }[]
 >([])
 
+// ============ 表格后端分页 ============
+const recentOffset = ref(0)
+const recentTotal = ref(0)
+const recentPageSize = 50
+const isLoadingMore = ref(false)
+const recentHasMore = computed(() => recentVisits.value.length < recentTotal.value)
+
+let tableScrollEl: HTMLElement | null = null
+
+function setupTableScroll() {
+  // el-table height 模式下滚动容器是 .el-scrollbar__wrap
+  tableScrollEl = document.querySelector('.table-body .el-scrollbar__wrap')
+  if (!tableScrollEl) {
+    // 兜底：再试 .el-table__body-wrapper
+    tableScrollEl = document.querySelector('.table-body .el-table__body-wrapper')
+  }
+  if (!tableScrollEl) return
+  console.log('[scroll] 监听表格滚动', tableScrollEl.className)
+  tableScrollEl.addEventListener('scroll', onTableScroll, { passive: true })
+}
+
+function onTableScroll() {
+  if (!tableScrollEl || !recentHasMore.value || isLoadingMore.value) return
+  const { scrollTop, scrollHeight, clientHeight } = tableScrollEl
+  if (scrollTop + clientHeight >= scrollHeight - 30) {
+    console.log('[scroll] 触发加载更多', {
+      scrollTop,
+      scrollHeight,
+      clientHeight,
+      offset: recentOffset.value,
+      total: recentTotal.value,
+    })
+    loadMoreRecent()
+  }
+}
+
+function formatVisit(v: any) {
+  let timeStr = ''
+  if (v.created_at) {
+    const d = new Date(v.created_at.replace(' ', 'T') + 'Z')
+    const cn = new Date(d.getTime() + 8 * 60 * 60 * 1000)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    timeStr = `${cn.getUTCFullYear()}-${pad(cn.getUTCMonth() + 1)}-${pad(cn.getUTCDate())} ${pad(cn.getUTCHours())}:${pad(cn.getUTCMinutes())}:${pad(cn.getUTCSeconds())}`
+  }
+  return {
+    time: timeStr,
+    page: pageNameMap[v.page] || v.page,
+    ip: v.ip ? v.ip.replace(/(\d+\.\d+)\.\d+\.\d+/, '$1.***.***') : '-',
+    country: v.country || '-',
+    region: v.region || '',
+    browser: v.browser || '-',
+  }
+}
+
+async function loadMoreRecent() {
+  if (isLoadingMore.value || !recentHasMore.value) return
+  isLoadingMore.value = true
+  try {
+    const range = getDateRange(activeFilter.value)
+    const params: Record<string, string | number> = {
+      limit: recentPageSize,
+      offset: recentOffset.value,
+    }
+    if (range.start) params.start = range.start
+    if (range.end) params.end = range.end
+
+    const res = (await getVisitorStats(params)) as any
+    if (res.recent?.length) {
+      recentVisits.value.push(...res.recent.map(formatVisit))
+      recentOffset.value += res.recent.length
+    }
+    recentTotal.value = res.recentTotal || 0
+  } catch (e) {
+    console.error('加载更多失败:', e)
+  } finally {
+    isLoadingMore.value = false
+  }
+}
+
 // 国家代码 → 名称 + 经纬度 + world.json中的名称
 const countryMap: Record<string, { name: string; geoName: string; coords: [number, number] }> = {
   CN: { name: '中国', geoName: 'China', coords: [104.195, 35.86] },
@@ -233,9 +319,14 @@ const pageNameMap: Record<string, string> = {
 // ============ 加载真实数据 ============
 async function loadData() {
   try {
-    const res = (await getVisitorStats()) as any
+    const range = getDateRange(activeFilter.value)
+    const filterParams: Record<string, string | number> = {}
+    if (range.start) filterParams.start = range.start
+    if (range.end) filterParams.end = range.end
 
-    // 统计
+    // 统计 + 图表数据：一次请求，不传分页参数
+    const res = (await getVisitorStats(filterParams)) as any
+
     if (res.stats) {
       stats.todayPV = res.stats.todayPV || 0
       stats.todayUV = res.stats.todayUV || 0
@@ -243,7 +334,6 @@ async function loadData() {
       stats.totalUV = res.stats.totalUV || 0
     }
 
-    // 地理分布 — 按国家聚合
     if (res.geo?.length) {
       const countryAgg = new Map<string, number>()
       for (const row of res.geo) {
@@ -255,7 +345,6 @@ async function loadData() {
         .sort((a, b) => b.value - a.value)
     }
 
-    // 页面排行（优先取 pages，否则从 recent 兜底聚合）
     if (res.pages?.length) {
       pageRank.value = res.pages
         .map((p: any) => ({
@@ -274,7 +363,6 @@ async function loadData() {
         .sort((a, b) => b.value - a.value)
     }
 
-    // 趋势
     if (res.trend?.length) {
       trendData.value = {
         dates: res.trend.map((t: any) => t.date?.slice(5) || ''),
@@ -283,28 +371,11 @@ async function loadData() {
       }
     }
 
-    // 最近访问
-    if (res.recent?.length) {
-      recentVisits.value = res.recent.map((v: any) => {
-        let timeStr = ''
-        if (v.created_at) {
-          // D1 返回格式如 "2026-04-17 20:09:58"（UTC），标记为 UTC 解析
-          const d = new Date(v.created_at.replace(' ', 'T') + 'Z')
-          // 转为中国时区（UTC+8），用 UTC 方法避免本地时区二次偏移
-          const cn = new Date(d.getTime() + 8 * 60 * 60 * 1000)
-          const pad = (n: number) => String(n).padStart(2, '0')
-          timeStr = `${cn.getUTCFullYear()}-${pad(cn.getUTCMonth() + 1)}-${pad(cn.getUTCDate())} ${pad(cn.getUTCHours())}:${pad(cn.getUTCMinutes())}:${pad(cn.getUTCSeconds())}`
-        }
-        return {
-          time: timeStr,
-          page: pageNameMap[v.page] || v.page,
-          ip: v.ip ? v.ip.replace(/(\d+)\.\d+\.\d+\.\d+/, '$1.***.***.***') : '-',
-          country: v.country || '-',
-          region: v.region || '',
-          browser: v.browser || '-',
-        }
-      })
-    }
+    // 表格：重置分页，加载第一页
+    recentTotal.value = res.recentTotal || 0
+    recentOffset.value = 0
+    recentVisits.value = (res.recent || []).map(formatVisit)
+    recentOffset.value = (res.recent || []).length
   } catch (e) {
     console.error('加载访客数据失败:', e)
   }
@@ -430,7 +501,7 @@ function updateMapChart(chart: ECharts) {
         showEffectOn: 'render',
         label: {
           show: true,
-          formatter: (params: any) => `${params.name} ${params.value[2]}人`,
+          formatter: (params: any) => `${params.name} ${params.value[2]}次`,
           position: 'right',
           color: '#c0d8f0',
           fontSize: 11,
@@ -613,6 +684,7 @@ onMounted(async () => {
     initTrendChart()
     initRankChart()
     setupResize()
+    setupTableScroll()
   }, 100)
 })
 
@@ -620,6 +692,7 @@ onUnmounted(() => {
   Object.values(charts).forEach((c) => c?.dispose())
   ro?.disconnect()
   if (resizeTimer) clearTimeout(resizeTimer)
+  if (tableScrollEl) tableScrollEl.removeEventListener('scroll', onTableScroll)
 })
 </script>
 
@@ -1023,6 +1096,20 @@ onUnmounted(() => {
   }
   :deep(.el-table__empty-text) {
     color: #5a7090;
+  }
+}
+
+// ====== 加载更多提示 ======
+.load-more-hint {
+  text-align: center;
+  padding: 6px 0;
+  font-size: 11px;
+  color: #5a7090;
+  letter-spacing: 0.5px;
+  position: relative;
+  z-index: 1;
+  &.done {
+    color: #3a5a70;
   }
 }
 
