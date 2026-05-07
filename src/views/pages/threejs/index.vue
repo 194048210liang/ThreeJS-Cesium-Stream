@@ -1,7 +1,25 @@
 <template>
   <div class="container">
-    <!-- 3D 渲染区域 -->
-    <div class="threejsBox" ref="threejsBox"></div>
+    <!-- 全局模式切换悬浮按钮 -->
+    <div class="global-mode-switch" :class="mode">
+      <div class="switch-slider"></div>
+      <button class="mode-btn" :class="{ active: mode === 'viewer' }" @click="switchMode('viewer')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        <span>模型查看器</span>
+      </button>
+      <button class="mode-btn" :class="{ active: mode === 'building' }" @click="switchMode('building')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><path d="M9 18h6v4H9z"/></svg>
+        <span>智慧楼宇</span>
+      </button>
+    </div>
+
+    <!-- 智慧楼宇模式 - v-if 可销毁重建 -->
+    <SmartBuilding v-if="mode === 'building'" key="building" />
+
+    <!-- 3D 查看器模式 - v-show 保持 DOM 不销毁，避免 Three.js canvas 丢失 -->
+    <div v-show="mode === 'viewer'" class="viewer-mode">
+      <!-- 3D 渲染区域 -->
+      <div class="threejsBox" ref="threejsBox"></div>
 
     <!-- 顶部导航栏 -->
     <div class="top-bar">
@@ -282,11 +300,12 @@
       style="display: none"
       @change="handleFileUpload"
     />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -303,6 +322,16 @@ import {
   ArrowLeft,
   ArrowRight,
 } from '@element-plus/icons-vue'
+import SmartBuilding from './SmartBuilding.vue'
+
+// ============ 模式切换 ============
+const mode = ref<'viewer' | 'building'>('viewer')
+const switchMode = (newMode: 'viewer' | 'building') => {
+  mode.value = newMode
+  if (newMode === 'viewer') {
+    nextTick(() => onResize())
+  }
+}
 
 // ============ DOM 引用 ============
 const threejsBox = ref<HTMLDivElement | null>(null)
@@ -1575,6 +1604,87 @@ $radius: 8px;
   }
   :deep(.el-divider--vertical) {
     border-color: $text-muted !important;
+  }
+
+  // ============ 全局模式切换 Segmented Control ============
+  .global-mode-switch {
+    position: absolute;
+    top: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    background: rgba(10, 14, 26, 0.85);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 2px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(108, 92, 231, 0.1);
+
+    .switch-slider {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: calc(50% - 4px);
+      height: calc(100% - 6px);
+      background: linear-gradient(135deg, rgba(108, 92, 231, 0.85), rgba(162, 155, 254, 0.65));
+      border-radius: 8px;
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 12px rgba(108, 92, 231, 0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+      z-index: 0;
+    }
+
+    &.building .switch-slider {
+      transform: translateX(calc(100% + 2px));
+    }
+
+    .mode-btn {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 18px;
+      border: none;
+      background: transparent;
+      color: $text-secondary;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.25s ease;
+      white-space: nowrap;
+      min-width: 80px;
+
+      &:hover { color: $text-primary; }
+
+      &.active {
+        color: #fff;
+        text-shadow: 0 0 10px rgba(255,255,255,0.3);
+      }
+    }
+  }
+
+  // ============ 模式切换过渡动画 ============
+  .mode-switch-enter-active,
+  .mode-switch-leave-active {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  .mode-switch-enter-from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  .mode-switch-leave-to {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+
+  // ============ 查看器模式容器 ============
+  .viewer-mode {
+    width: 100%;
+    height: 100%;
+    position: relative;
   }
 }
 </style>
